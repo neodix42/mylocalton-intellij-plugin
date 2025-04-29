@@ -247,10 +247,14 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
             TitledBorder.LEFT,
             TitledBorder.TOP));
 
-    // Create a grid layout for checkboxes
-    JPanel checkboxPanel = new JPanel(new GridLayout(3, 2, 10, 5));
+    // Create a panel with BoxLayout for vertical arrangement
+    JPanel contentPanel = new JPanel();
+    contentPanel.setLayout(new BoxLayout(contentPanel, BoxLayout.Y_AXIS));
 
-    JCheckBox checkbox1 = new JCheckBox("TON Http API v2");
+    // Create a grid layout for checkboxes
+    JPanel checkboxPanel = new JPanel(new GridLayout(0, 2, 10, 5));
+
+    JCheckBox checkbox1 = new JCheckBox("TON HTTP API v2");
     checkbox1.setToolTipText("Enables ton-http-api service on start.");
     JCheckBox checkbox2 = new JCheckBox("Web explorer");
     checkbox2.setToolTipText("Enables native TON blockchain web explorer on start.");
@@ -258,15 +262,47 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
     checkbox3.setToolTipText("Enables dummy data-generator on start.");
     JCheckBox checkbox4 = new JCheckBox("No GUI mode");
     checkbox4.setToolTipText("Launches MyLocalTon without GUI.");
+    
+    // Create a panel for the listbox and label to be placed below "No GUI mode"
+    JPanel listboxPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+    
+    // Create a listbox (JComboBox) with numbers 0 to 5
+    Integer[] numbers = {0, 1, 2, 3, 4, 5};
+    JComboBox<Integer> listbox = new JComboBox<>(numbers);
+    
+    // Make the combobox width two times smaller
+    Dimension comboBoxSize = listbox.getPreferredSize();
+    comboBoxSize.width = comboBoxSize.width - 20;
+    listbox.setPreferredSize(comboBoxSize);
+    
+//    listbox.addActionListener(new ActionListener() {
+//        @Override
+//        public void actionPerformed(ActionEvent e) {
+//            Integer selectedValue = (Integer) listbox.getSelectedItem();
+//            com.intellij.openapi.ui.Messages.showInfoMessage(
+//                project, "Selected value: " + selectedValue, "MyLocalTon Plugin");
+//        }
+//    });
+    
+    // Add the listbox to the panel
+    listboxPanel.add(listbox);
+    
+    // Add the "add validators" label next to the listbox
+    JLabel validatorsLabel = new JLabel("add validators");
+    listboxPanel.add(validatorsLabel);
+    
     JCheckBox checkbox5 = new JCheckBox("Debug mode");
     checkbox5.setToolTipText("Launches MyLocalTon in debug mode that add lots of useful information into log files.");
+    
     checkboxPanel.add(checkbox1);
     checkboxPanel.add(checkbox2);
     checkboxPanel.add(checkbox3);
     checkboxPanel.add(checkbox4);
+    checkboxPanel.add(listboxPanel);
     checkboxPanel.add(checkbox5);
 
-    panel.add(checkboxPanel, BorderLayout.CENTER);
+    contentPanel.add(checkboxPanel);
+    panel.add(contentPanel, BorderLayout.CENTER);
 
     return panel;
   }
