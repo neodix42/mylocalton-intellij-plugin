@@ -1,0 +1,19 @@
+<idea-plugin>
+  <id>org.ton.mylocalton.plugin</id>
+  <name>MyLocalTon</name>
+  <vendor email="neodix@ton.org" url="https://www.ton.org">TON Core Technologies</vendor>
+  <description>
+    MyLocalTon allows you to launch your private customized local TON blockchain.
+  </description>
+
+  <depends>com.intellij.modules.platform</depends>
+
+  <extensions defaultExtensionNs="com.intellij">
+    <!-- Register a tool window -->
+    <toolWindow id="MyLocalTon"
+                anchor="right" 
+                secondary="false"
+                icon="/ton_symbol.svg"
+                factoryClass="org.ton.mylocalton.plugin.MyLocalTonToolWindowFactory"/>
+  </extensions>
+</idea-plugin>
