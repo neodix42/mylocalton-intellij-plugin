@@ -146,6 +146,43 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
     }
   }
 
+  /**
+   * Determines if the system is running on ARM architecture.
+   * 
+   * @return true if running on ARM architecture, false otherwise (likely x86-64)
+   */
+  private boolean isArmArchitecture() {
+    String arch = System.getProperty("os.arch").toLowerCase();
+    return arch.contains("arm") || arch.contains("aarch");
+  }
+  
+  /**
+   * Gets the appropriate JAR filename based on architecture and testnet selection.
+   * 
+   * @param isTestnet Whether testnet is selected
+   * @return The appropriate JAR filename
+   */
+  private String getJarFilename(boolean isTestnet) {
+    boolean isArm = isArmArchitecture();
+    
+    if (isArm) {
+      return isTestnet ? "MyLocalTon-arm64-testnet.jar" : "MyLocalTon-arm64.jar";
+    } else {
+      return isTestnet ? "MyLocalTon-x86-64-testnet.jar" : "MyLocalTon-x86-64.jar";
+    }
+  }
+  
+  /**
+   * Gets the download URL for the JAR file based on architecture and testnet selection.
+   * 
+   * @param isTestnet Whether testnet is selected
+   * @return The URL to download the JAR file from
+   */
+  private String getDownloadUrl(boolean isTestnet) {
+    String baseUrl = "https://github.com/neodix42/mylocalton/releases/latest/download/";
+    return baseUrl + getJarFilename(isTestnet);
+  }
+
   private JPanel createInstallationPanel(Project project) {
     JPanel panel = new JPanel(new BorderLayout(10, 10));
     panel.setBorder(
@@ -154,10 +191,14 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
             "Installation",
             TitledBorder.LEFT,
             TitledBorder.TOP));
+    
+    // Create testnet checkbox first so we can use it for file existence check
+    JCheckBox testnetCheckbox = new JCheckBox("Testnet");
+    testnetCheckbox.setToolTipText("Download MyLocalTon based on TON binaries from testnet branch.");
             
     // Check if JAR file exists
     Path downloadDir = Paths.get(System.getProperty("user.home"), ".mylocalton");
-    Path jarPath = downloadDir.resolve("MyLocalTon-x86-64.jar");
+    Path jarPath = downloadDir.resolve(getJarFilename(testnetCheckbox.isSelected()));
     boolean jarExists = Files.exists(jarPath);
 
     // Create top panel with centered Download button and progress bar
@@ -188,6 +229,9 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
           public void actionPerformed(ActionEvent e) {
             LOG.warn("Download button clicked");
 
+            // Get testnet checkbox state
+            boolean isTestnet = testnetCheckbox.isSelected();
+            
             // Make progress bar visible when Download button is clicked
             progressBar.setVisible(true);
 
@@ -198,9 +242,9 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
             new Thread(
                     () -> {
                       try {
-                        // URL of the file to download
-                        String fileUrl =
-                            "https://github.com/neodix42/mylocalton/releases/latest/download/MyLocalTon-x86-64.jar";
+                        // URL of the file to download based on architecture and testnet selection
+                        String fileUrl = getDownloadUrl(isTestnet);
+                        LOG.warn("Downloading from URL: " + fileUrl);
 
                         // Create a directory for the download if it doesn't exist
                         Path downloadDir =
@@ -210,7 +254,8 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
                         }
 
                         // Path where the file will be saved
-                        Path targetPath = downloadDir.resolve("MyLocalTon-x86-64.jar");
+                        String jarFilename = getJarFilename(isTestnet);
+                        Path targetPath = downloadDir.resolve(jarFilename);
                         File targetFile = targetPath.toFile();
 
                         // Download the file and update progress
@@ -354,8 +399,6 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
 
     // Add Testnet checkbox to the bottom right
     JPanel rightPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
-    JCheckBox testnetCheckbox = new JCheckBox("Testnet");
-    testnetCheckbox.setToolTipText("Download MyLocalTon based on TON binaries from testnet branch.");
     rightPanel.add(testnetCheckbox);
     bottomPanel.add(rightPanel, BorderLayout.EAST);
 
@@ -448,12 +491,21 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
             try {
               // Get the path to the downloaded JAR file
               Path downloadDir = Paths.get(System.getProperty("user.home"), ".mylocalton");
-              Path jarPath = downloadDir.resolve("MyLocalTon-x86-64.jar");
+              
+              // Check for any of the possible JAR files
+              String jarFilename = getJarFilename(false); // Try mainnet first
+              Path jarPath = downloadDir.resolve(jarFilename);
+              
+              if (!Files.exists(jarPath)) {
+                // Try testnet version
+                jarFilename = getJarFilename(true);
+                jarPath = downloadDir.resolve(jarFilename);
+              }
               
               if (!Files.exists(jarPath)) {
                 com.intellij.openapi.ui.Messages.showErrorDialog(
                     project, 
-                    "MyLocalTon-x86-64.jar not found. Please download it first.", 
+                    "MyLocalTon JAR file not found. Please download it first.", 
                     "MyLocalTon Plugin");
                 return;
               }
