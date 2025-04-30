@@ -36,6 +36,8 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
   private JButton stopButton;
   private JButton resetButton;
   private JPanel startupSettingsPanel;
+  private JCheckBox testnetCheckbox; // Reference to the testnet checkbox
+  private JButton downloadButton;
 
   static {
     LOG.warn("DemoToolWindowFactory class loaded");
@@ -191,9 +193,10 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
             "Installation",
             TitledBorder.LEFT,
             TitledBorder.TOP));
-    
+
+    downloadButton = new JButton();
     // Create testnet checkbox
-    JCheckBox testnetCheckbox = new JCheckBox("Testnet");
+    testnetCheckbox = new JCheckBox("Testnet");
     testnetCheckbox.setToolTipText("Download MyLocalTon based on TON binaries from testnet branch.");
             
     // Check if any JAR file exists (both mainnet and testnet versions for both architectures)
@@ -236,8 +239,9 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
     progressPanel.add(progressBar);
 
     // Download button - set initial state based on JAR existence
-    JButton downloadButton = new JButton(jarExists ? "DOWNLOADED" : "DOWNLOAD");
+    downloadButton.setText(jarExists ? "DOWNLOADED" : "DOWNLOAD");
     downloadButton.setEnabled(!jarExists); // Disable if JAR exists
+    testnetCheckbox.setEnabled(!jarExists);
     downloadButton.setPreferredSize(new Dimension(150, 30));
     downloadButton.addActionListener(
         new ActionListener() {
@@ -253,6 +257,7 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
 
             // Disable the download button during download
             downloadButton.setEnabled(false);
+            testnetCheckbox.setEnabled(false);
 
             // Create a thread for downloading the file
             new Thread(
@@ -283,6 +288,7 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
                               // Change download button text and keep it disabled
                               downloadButton.setText("DOWNLOADED");
                               downloadButton.setEnabled(false);
+                              testnetCheckbox.setEnabled(false);
 
                               // Get the left panel to add the "Open Location" link
                               JPanel bottomPanel = (JPanel) panel.getComponent(1); // Get the bottom panel
@@ -354,6 +360,7 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
                               // Keep the download button disabled but change text back to original
                               downloadButton.setText("DOWNLOAD");
                               downloadButton.setEnabled(true);
+                              testnetCheckbox.setEnabled(true);
                             });
                       }
                     })
@@ -504,6 +511,7 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
           public void actionPerformed(ActionEvent e) {
             LOG.warn("Start button clicked");
             
+
             try {
               // Get the path to the downloaded JAR file
               Path downloadDir = Paths.get(System.getProperty("user.home"), ".mylocalton");
@@ -565,7 +573,16 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
           }
         });
     
-    stopButton = createButton("Stop", project, "Stop operation initiated!");
+    stopButton = new JButton("Stop");
+    stopButton.addActionListener(
+        new ActionListener() {
+          @Override
+          public void actionPerformed(ActionEvent e) {
+            LOG.warn("Stop button clicked");
+
+            com.intellij.openapi.ui.Messages.showInfoMessage(project, "Stop operation initiated!", "MyLocalTon Plugin");
+          }
+        });
     resetButton = createButton("Reset", project, "Reset operation initiated!");
     resetButton.setToolTipText("Reset MyLocalTon to its default state");
 
@@ -746,67 +763,10 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
    * @param mainPanel The main panel containing all sections
    */
   private void updateDownloadButtonAfterDeletion(JPanel mainPanel) {
-    try {
-      // Find the installation panel
-      for (Component comp : mainPanel.getComponents()) {
-        if (comp instanceof JPanel) {
-          JPanel panelComp = (JPanel) comp;
-          if (panelComp.getBorder() instanceof TitledBorder) {
-            TitledBorder border = (TitledBorder) panelComp.getBorder();
-            if ("Installation".equals(border.getTitle())) {
-              // Found the installation panel
-              JPanel installationPanel = panelComp;
-              
-              // Find the top panel with the download button
-              Component northComp = ((BorderLayout) installationPanel.getLayout()).getLayoutComponent(BorderLayout.NORTH);
-              if (northComp instanceof JPanel) {
-                JPanel topPanel = (JPanel) northComp;
-                
-                // Find the button panel
-                if (topPanel.getComponentCount() > 0 && topPanel.getComponent(0) instanceof JPanel) {
-                  JPanel buttonPanel = (JPanel) topPanel.getComponent(0);
-                  
-                  // Find the download button
-                  for (Component buttonComp : buttonPanel.getComponents()) {
-                    if (buttonComp instanceof JButton) {
-                      JButton button = (JButton) buttonComp;
-                      if ("DOWNLOADED".equals(button.getText())) {
-                        // Reset the button
-                        button.setText("DOWNLOAD");
-                        button.setEnabled(true);
-                        break;
-                      }
-                    }
-                  }
-                }
-              }
-              
-              // Find the bottom panel to update the label
-              Component southComp = ((BorderLayout) installationPanel.getLayout()).getLayoutComponent(BorderLayout.SOUTH);
-              if (southComp instanceof JPanel) {
-                JPanel bottomPanel = (JPanel) southComp;
-                Component westComp = ((BorderLayout) bottomPanel.getLayout()).getLayoutComponent(BorderLayout.WEST);
-                
-                if (westComp instanceof JPanel) {
-                  JPanel leftPanel = (JPanel) westComp;
-                  
-                  // Remove any existing components (like the "Open Location" link)
-                  leftPanel.removeAll();
-                  
-                  // No label needed after deletion
-                  leftPanel.revalidate();
-                  leftPanel.repaint();
-                }
-              }
-              
-              break;
-            }
-          }
-        }
-      }
-    } catch (Exception ex) {
-      LOG.warn("Error updating download button after deletion: " + ex.getMessage(), ex);
-    }
+
+      downloadButton.setText("DOWNLOAD");
+      downloadButton.setEnabled(true);
+      testnetCheckbox.setEnabled(true);
   }
 
   /**
