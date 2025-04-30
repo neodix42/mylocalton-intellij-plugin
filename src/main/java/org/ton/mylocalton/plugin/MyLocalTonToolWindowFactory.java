@@ -9,6 +9,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 
 import java.awt.*;
+import java.awt.datatransfer.StringSelection;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.MouseAdapter;
@@ -31,6 +32,7 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
   // Use static logger to avoid initialization issues
   private static final Logger LOG = Logger.getInstance(MyLocalTonToolWindowFactory.class);
   private JLabel statusLabel;
+  private JLabel infoLabel; // Label to show "absolute path was copied" message
   private Timer lockFileMonitor;
   private JButton startButton;
   private JButton stopButton;
@@ -116,7 +118,7 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
       // 3. Actions Section
       JPanel actionsPanel = createActionsPanel(project);
       actionsPanel.setAlignmentX(Component.LEFT_ALIGNMENT); // Top align
-      actionsPanel.setMaximumSize(new Dimension(Integer.MAX_VALUE, 200)); // Fixed height
+      actionsPanel.setMaximumSize(new Dimension(Integer.MAX_VALUE, 230)); // Fixed height
       mainPanel.add(actionsPanel);
       mainPanel.add(Box.createVerticalStrut(5)); // Reduced spacing for compactness
 
@@ -610,6 +612,26 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
     buttonsPanel.add(Box.createVerticalGlue());
 
     panel.add(buttonsPanel, BorderLayout.CENTER);
+    
+    // Create a separate panel for the info label
+    JPanel infoPanel = new JPanel();
+    infoPanel.setLayout(new BoxLayout(infoPanel, BoxLayout.Y_AXIS));
+    
+    // Add info label in its own panel
+    infoLabel = new JLabel(" "); // Space character to maintain height
+    infoLabel.setPreferredSize(new Dimension(180, 15));
+    infoLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+    infoLabel.setHorizontalAlignment(SwingConstants.CENTER); // Center text within the label
+    //infoLabel.setForeground(new Color(255, 165, 0)); // Orange color for better visibility
+    //infoLabel.setFont(infoLabel.getFont().deriveFont(Font.BOLD)); // Make text bold
+    
+    // Center the info label horizontally
+    JPanel infoLabelPanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
+    infoLabelPanel.add(infoLabel);
+    infoPanel.add(infoLabelPanel);
+    
+    // Add the info panel below the buttons panel
+    panel.add(infoPanel, BorderLayout.NORTH); // Place at the top for better visibility
 
     // Create bottom panel with GridBagLayout for precise positioning
     JPanel southPanel = new JPanel(new GridBagLayout());
@@ -619,9 +641,61 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
     linksPanel.setLayout(new BoxLayout(linksPanel, BoxLayout.Y_AXIS));
     
     // Create the links
-    JLabel tonlibLink = createLink("tonlib.dll", project, "tonlib.dll clicked");
-    JLabel configLink = createLink("global.config.json", project, "global.config.json clicked");
+    JLabel tonlibLink = createLink("tonlib.dll", project, null);
+    JLabel configLink = createLink("global.config.json", project, null);
     JLabel myLocalTonLogLink = createLink("myLocalTon.log", project, "myLocalTon.log clicked");
+    
+    // Add click handler for tonlibLink to copy path to clipboard
+    tonlibLink.addMouseListener(new MouseAdapter() {
+      @Override
+      public void mouseClicked(MouseEvent e) {
+        LOG.warn("tonlib.dll link clicked");
+        String userHome = System.getProperty("user.home");
+        String osName = System.getProperty("os.name").toLowerCase();
+        String tonlibPath;
+        
+        // Determine the appropriate path based on OS
+        if (osName.contains("win")) {
+          tonlibPath = userHome + "\\.mylocalton\\myLocalTon\\genesis\\bin\\tonlibjson.dll";
+        } else if (osName.contains("mac")) {
+          tonlibPath = userHome + "/.mylocalton/myLocalTon/genesis/bin/tonlibjson.dylib";
+        } else {
+          // Assume Linux or other Unix-like OS
+          tonlibPath = userHome + "/.mylocalton/myLocalTon/genesis/bin/tonlibjson.so";
+        }
+        
+        // Copy path to clipboard
+        copyToClipboard(tonlibPath);
+        
+        // Show info message and set timer to hide it
+        showCopiedMessage();
+      }
+    });
+    
+    // Add click handler for configLink to copy path to clipboard
+    configLink.addMouseListener(new MouseAdapter() {
+      @Override
+      public void mouseClicked(MouseEvent e) {
+        LOG.warn("global.config.json link clicked");
+        String userHome = System.getProperty("user.home");
+        String osName = System.getProperty("os.name").toLowerCase();
+        String configPath;
+        
+        // Determine the appropriate path based on OS
+        if (osName.contains("win")) {
+          configPath = userHome + "\\.mylocalton\\myLocalTon\\genesis\\db\\my-ton-local.config.json";
+        } else {
+          // For Linux and macOS
+          configPath = userHome + "/.mylocalton/myLocalTon/genesis/db/my-ton-local.config.json";
+        }
+        
+        // Copy path to clipboard
+        copyToClipboard(configPath);
+        
+        // Show info message and set timer to hide it
+        showCopiedMessage();
+      }
+    });
     
     // Create panels with left alignment for each link and minimal vertical padding
     JPanel firstLinkPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 5, 0));
@@ -830,6 +904,37 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
    * @param progressBar JProgressBar to update with download progress
    * @throws IOException If an I/O error occurs during download
    */
+  /**
+   * Copies the given text to the system clipboard.
+   *
+   * @param text The text to copy to the clipboard
+   */
+  private void copyToClipboard(String text) {
+    StringSelection selection = new StringSelection(text);
+    Toolkit.getDefaultToolkit().getSystemClipboard().setContents(selection, null);
+    LOG.warn("Copied to clipboard: " + text);
+  }
+  
+  /**
+   * Shows the "absolute path was copied" message in the info label and sets a timer to hide it after 3 seconds.
+   */
+  private void showCopiedMessage() {
+    // Update the info label
+    infoLabel.setText("Absolute path was copied.");
+    
+    // Create a timer to reset the message after 3 seconds
+    Timer hideTimer = new Timer(3000, new ActionListener() {
+      @Override
+      public void actionPerformed(ActionEvent e) {
+        infoLabel.setText(" "); // Reset to space character to maintain layout
+        // Ensure horizontal alignment is maintained
+        infoLabel.setHorizontalAlignment(SwingConstants.CENTER);
+      }
+    });
+    hideTimer.setRepeats(false); // Only execute once
+    hideTimer.start();
+  }
+  
   private void downloadFile(String fileUrl, File targetFile, JProgressBar progressBar)
       throws IOException {
     URL url = new URL(fileUrl);
