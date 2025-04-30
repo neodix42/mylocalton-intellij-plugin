@@ -7,6 +7,7 @@ import com.intellij.openapi.wm.ToolWindowFactory;
 import com.intellij.ui.content.ContentFactory;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
+import org.jetbrains.annotations.NotNull;
 
 import java.awt.*;
 import java.awt.datatransfer.StringSelection;
@@ -40,6 +41,7 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
   private JPanel startupSettingsPanel;
   private JCheckBox testnetCheckbox; // Reference to the testnet checkbox
   private JButton downloadButton;
+  private Process process;
 
   static {
     LOG.warn("DemoToolWindowFactory class loaded");
@@ -557,13 +559,15 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
               processBuilder.redirectErrorStream(true);
               
               // Start the process
-              Process process = processBuilder.start();
+              process = processBuilder.start();
               
-              // Show a message with the executed command
-              com.intellij.openapi.ui.Messages.showInfoMessage(
-                  project, 
-                  "Executing command: " + command.toString(), 
-                  "MyLocalTon Plugin");
+//              // Show a message with the executed command
+//              com.intellij.openapi.ui.Messages.showInfoMessage(
+//                  project,
+//                  "Executing command: " + command.toString(),
+//                  "MyLocalTon Plugin");
+
+              showCopiedMessage("Starting...");
               
             } catch (Exception ex) {
               LOG.warn("Error executing command: " + ex.getMessage(), ex);
@@ -577,14 +581,11 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
     
     stopButton = new JButton("Stop");
     stopButton.addActionListener(
-        new ActionListener() {
-          @Override
-          public void actionPerformed(ActionEvent e) {
-            LOG.warn("Stop button clicked");
+            e -> {
+              LOG.warn("Stop button clicked");
 
-            com.intellij.openapi.ui.Messages.showInfoMessage(project, "Stop operation initiated!", "MyLocalTon Plugin");
-          }
-        });
+              process.destroy();
+            });
     resetButton = createButton("Reset", project, "Reset operation initiated!");
     resetButton.setToolTipText("Reset MyLocalTon to its default state");
 
@@ -641,34 +642,68 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
     linksPanel.setLayout(new BoxLayout(linksPanel, BoxLayout.Y_AXIS));
     
     // Create the links
-    JLabel tonlibLink = createLink("tonlib.dll", project, null);
+    String tonlibName = new File(getTonlibPath(System.getProperty("user.home"))).getName();
+    JLabel tonlibLink = createLink(tonlibName, project, null);
     JLabel configLink = createLink("global.config.json", project, null);
-    JLabel myLocalTonLogLink = createLink("myLocalTon.log", project, "myLocalTon.log clicked");
-    
+    JLabel myLocalTonLogLink = createLink("myLocalTon.log", project, null);
+
+    // Add click handler for myLocalTonLogLink to open the log file
+    myLocalTonLogLink.addMouseListener(
+        new MouseAdapter() {
+          @Override
+          public void mouseClicked(MouseEvent e) {
+            LOG.warn("myLocalTon.log link clicked");
+            String userHome = System.getProperty("user.home");
+            String osName = System.getProperty("os.name").toLowerCase();
+            String logFilePath;
+
+            // Determine the appropriate path based on OS
+            if (osName.contains("win")) {
+              logFilePath = userHome + "\\.mylocalton\\myLocalTon\\myLocalTon.log";
+            } else {
+              logFilePath = userHome + "/.mylocalton/myLocalTon/myLocalTon.log";
+            }
+
+            try {
+              // Create a File object for the log file
+              File logFile = new File(logFilePath);
+
+              // Check if the file exists
+              if (!logFile.exists()) {
+                com.intellij.openapi.ui.Messages.showErrorDialog(
+                    project, "Log file not found at: " + logFilePath, "MyLocalTon Plugin");
+                return;
+              }
+
+              // Open the file with the default text editor
+              if (Desktop.isDesktopSupported()) {
+                Desktop.getDesktop().open(logFile);
+              } else {
+                // Fallback for systems where Desktop is not supported
+                com.intellij.openapi.ui.Messages.showInfoMessage(
+                    project, "Log file location: " + logFilePath, "MyLocalTon Plugin");
+              }
+            } catch (Exception ex) {
+              LOG.warn("Error opening log file: " + ex.getMessage(), ex);
+              com.intellij.openapi.ui.Messages.showErrorDialog(
+                  project, "Error opening log file: " + ex.getMessage(), "MyLocalTon Plugin");
+            }
+          }
+        });
+
     // Add click handler for tonlibLink to copy path to clipboard
     tonlibLink.addMouseListener(new MouseAdapter() {
       @Override
       public void mouseClicked(MouseEvent e) {
-        LOG.warn("tonlib.dll link clicked");
+        LOG.warn("tonlibjson link clicked");
         String userHome = System.getProperty("user.home");
-        String osName = System.getProperty("os.name").toLowerCase();
-        String tonlibPath;
-        
-        // Determine the appropriate path based on OS
-        if (osName.contains("win")) {
-          tonlibPath = userHome + "\\.mylocalton\\myLocalTon\\genesis\\bin\\tonlibjson.dll";
-        } else if (osName.contains("mac")) {
-          tonlibPath = userHome + "/.mylocalton/myLocalTon/genesis/bin/tonlibjson.dylib";
-        } else {
-          // Assume Linux or other Unix-like OS
-          tonlibPath = userHome + "/.mylocalton/myLocalTon/genesis/bin/tonlibjson.so";
-        }
-        
+        String tonlibPath = getTonlibPath(userHome);
+
         // Copy path to clipboard
         copyToClipboard(tonlibPath);
         
         // Show info message and set timer to hide it
-        showCopiedMessage();
+        showCopiedMessage("Absolute path was copied.");
       }
     });
     
@@ -693,7 +728,7 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
         copyToClipboard(configPath);
         
         // Show info message and set timer to hide it
-        showCopiedMessage();
+        showCopiedMessage("Absolute path was copied.");
       }
     });
     
@@ -742,6 +777,22 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
     panel.add(southPanel, BorderLayout.SOUTH);
 
     return panel;
+  }
+
+  private static @NotNull String getTonlibPath(String userHome) {
+    String osName = System.getProperty("os.name").toLowerCase();
+    String tonlibPath;
+
+    // Determine the appropriate path based on OS
+    if (osName.contains("win")) {
+      tonlibPath = userHome + "\\.mylocalton\\myLocalTon\\genesis\\bin\\tonlibjson.dll";
+    } else if (osName.contains("mac")) {
+      tonlibPath = userHome + "/.mylocalton/myLocalTon/genesis/bin/tonlibjson.dylib";
+    } else {
+      // Assume Linux or other Unix-like OS
+      tonlibPath = userHome + "/.mylocalton/myLocalTon/genesis/bin/tonlibjson.so";
+    }
+    return tonlibPath;
   }
 
   private JPanel createUninstallPanel(Project project) {
@@ -918,9 +969,9 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
   /**
    * Shows the "absolute path was copied" message in the info label and sets a timer to hide it after 3 seconds.
    */
-  private void showCopiedMessage() {
+  private void showCopiedMessage(String text) {
     // Update the info label
-    infoLabel.setText("Absolute path was copied.");
+    infoLabel.setText(text);
     
     // Create a timer to reset the message after 3 seconds
     Timer hideTimer = new Timer(3000, new ActionListener() {
