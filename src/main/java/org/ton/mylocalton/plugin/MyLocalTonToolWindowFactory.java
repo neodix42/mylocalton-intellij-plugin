@@ -30,9 +30,62 @@ import javax.swing.border.TitledBorder;
 public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
   // Use static logger to avoid initialization issues
   private static final Logger LOG = Logger.getInstance(MyLocalTonToolWindowFactory.class);
+  private JLabel statusLabel;
+  private Timer lockFileMonitor;
+  private JButton startButton;
+  private JButton stopButton;
+  private JButton resetButton;
+  private JPanel startupSettingsPanel;
 
   static {
     LOG.warn("DemoToolWindowFactory class loaded");
+  }
+  
+  /**
+   * Checks if the myLocalTon.lock file exists in the user.dir directory.
+   * 
+   * @return true if the lock file exists, false otherwise
+   */
+  private boolean isLockFileExists() {
+    String userDir = System.getProperty("user.home");
+    Path lockFilePath = Paths.get(userDir, "myLocalTon.lock");
+    return Files.exists(lockFilePath);
+  }
+  
+  /**
+   * Updates the status label, button states, and panel states based on the lock file existence.
+   */
+  private void updateStatusLabel() {
+    boolean lockExists = isLockFileExists();
+    
+    if (statusLabel != null) {
+      if (lockExists) {
+        statusLabel.setText("Status: running");
+      } else {
+        statusLabel.setText("Status: not running");
+      }
+    }
+    
+    // Update button states based on lock file existence
+    if (startButton != null) {
+      startButton.setEnabled(!lockExists); // Disable Start when lock exists
+    }
+    
+    if (stopButton != null) {
+      stopButton.setEnabled(lockExists); // Disable Stop when lock doesn't exist
+    }
+    
+    if (resetButton != null) {
+      resetButton.setEnabled(lockExists); // Disable Reset when lock doesn't exist
+    }
+    
+    // Disable/enable the startup settings panel based on lock file existence
+    if (startupSettingsPanel != null) {
+      startupSettingsPanel.setEnabled(!lockExists); // Disable when lock exists
+      
+      // Recursively disable/enable all components inside the panel
+      setEnabledRecursively(startupSettingsPanel, !lockExists);
+    }
   }
 
   @Override
@@ -52,7 +105,7 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
       mainPanel.add(Box.createVerticalStrut(5)); // Reduced spacing for compactness
 
       // 2. Startup settings Section
-      JPanel startupSettingsPanel = createStartupSettingsPanel(project);
+      startupSettingsPanel = createStartupSettingsPanel(project);
       startupSettingsPanel.setAlignmentX(Component.LEFT_ALIGNMENT); // Top align
       startupSettingsPanel.setMaximumSize(new Dimension(Integer.MAX_VALUE, 160)); // Fixed height
       mainPanel.add(startupSettingsPanel);
@@ -76,6 +129,16 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
       com.intellij.ui.content.Content content =
           contentFactory.createContent(mainPanel, "MyLocalTon", false);
       toolWindow.getContentManager().addContent(content);
+
+      // Start the timer to check the lock file status every 5 seconds
+      lockFileMonitor = new Timer(5000, new ActionListener() {
+        @Override
+        public void actionPerformed(ActionEvent e) {
+          updateStatusLabel();
+        }
+      });
+      lockFileMonitor.setInitialDelay(0);
+      lockFileMonitor.start();
 
       LOG.warn("Tool window content created successfully");
     } catch (Exception e) {
@@ -285,16 +348,14 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
           });
       leftPanel.add(openLocationLink);
     } else {
-      // If JAR doesn't exist, show "Ready to download" label
-      JLabel readyLabel = new JLabel("Ready to download.");
-      leftPanel.add(readyLabel);
+      // JAR doesn't exist, but we don't need to show any label
     }
     bottomPanel.add(leftPanel, BorderLayout.WEST);
 
     // Add Testnet checkbox to the bottom right
     JPanel rightPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
     JCheckBox testnetCheckbox = new JCheckBox("Testnet");
-    testnetCheckbox.setToolTipText("Enable testnet mode for installation");
+    testnetCheckbox.setToolTipText("Download MyLocalTon based on TON binaries from testnet branch.");
     rightPanel.add(testnetCheckbox);
     bottomPanel.add(rightPanel, BorderLayout.EAST);
 
@@ -377,7 +438,7 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
     centerPanel.setLayout(new BoxLayout(centerPanel, BoxLayout.Y_AXIS));
 
     // Create buttons
-    JButton startButton = new JButton("Start");
+    startButton = new JButton("Start");
     startButton.addActionListener(
         new ActionListener() {
           @Override
@@ -436,8 +497,8 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
           }
         });
     
-    JButton stopButton = createButton("Stop", project, "Stop operation initiated!");
-    JButton resetButton = createButton("Reset", project, "Reset operation initiated!");
+    stopButton = createButton("Stop", project, "Stop operation initiated!");
+    resetButton = createButton("Reset", project, "Reset operation initiated!");
     resetButton.setToolTipText("Reset MyLocalTon to its default state");
 
     // Center-align buttons
@@ -486,9 +547,12 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
 
     // Add status label to the bottom right
     JPanel rightPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
-    JLabel statusLabel = new JLabel("Status: Ready");
+    statusLabel = new JLabel("Status: Ready");
     rightPanel.add(statusLabel);
     southPanel.add(rightPanel, BorderLayout.EAST);
+    
+    // Initial check of lock file status and update button states
+    updateStatusLabel();
 
     panel.add(southPanel, BorderLayout.SOUTH);
 
@@ -635,9 +699,7 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
                   // Remove any existing components (like the "Open Location" link)
                   leftPanel.removeAll();
                   
-                  // Add back the "Ready to download" label
-                  JLabel readyLabel = new JLabel("Ready to download.");
-                  leftPanel.add(readyLabel);
+                  // No label needed after deletion
                   leftPanel.revalidate();
                   leftPanel.repaint();
                 }
@@ -653,6 +715,26 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
     }
   }
 
+  /**
+   * Recursively sets the enabled state of a container and all its child components.
+   *
+   * @param container The container to set the enabled state for
+   * @param enabled The enabled state to set
+   */
+  private void setEnabledRecursively(Container container, boolean enabled) {
+    container.setEnabled(enabled);
+    
+    // Process all components in the container
+    for (Component component : container.getComponents()) {
+      component.setEnabled(enabled);
+      
+      // If the component is a container, process its children recursively
+      if (component instanceof Container) {
+        setEnabledRecursively((Container) component, enabled);
+      }
+    }
+  }
+  
   private JButton createButton(String text, Project project, String message) {
     JButton button = new JButton(text);
     button.addActionListener(
