@@ -5,6 +5,9 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.wm.ToolWindow;
 import com.intellij.openapi.wm.ToolWindowFactory;
 import com.intellij.ui.content.ContentFactory;
+import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.IOUtils;
+
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
@@ -16,6 +19,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -45,21 +49,29 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
 
       // 1. Installation Section
       JPanel installationPanel = createInstallationPanel(project);
+      installationPanel.setAlignmentX(Component.LEFT_ALIGNMENT); // Top align
+      installationPanel.setMaximumSize(new Dimension(Integer.MAX_VALUE, 150)); // Fixed height
       mainPanel.add(installationPanel);
-      mainPanel.add(Box.createVerticalStrut(10)); // Add spacing
+      mainPanel.add(Box.createVerticalStrut(5)); // Reduced spacing for compactness
 
       // 2. Startup settings Section
       JPanel startupSettingsPanel = createStartupSettingsPanel(project);
+      startupSettingsPanel.setAlignmentX(Component.LEFT_ALIGNMENT); // Top align
+      startupSettingsPanel.setMaximumSize(new Dimension(Integer.MAX_VALUE, 160)); // Fixed height
       mainPanel.add(startupSettingsPanel);
-      mainPanel.add(Box.createVerticalStrut(10)); // Add spacing
+      mainPanel.add(Box.createVerticalStrut(5)); // Reduced spacing for compactness
 
       // 3. Actions Section
       JPanel actionsPanel = createActionsPanel(project);
+      actionsPanel.setAlignmentX(Component.LEFT_ALIGNMENT); // Top align
+      actionsPanel.setMaximumSize(new Dimension(Integer.MAX_VALUE, 180)); // Fixed height
       mainPanel.add(actionsPanel);
-      mainPanel.add(Box.createVerticalStrut(10)); // Add spacing
+      mainPanel.add(Box.createVerticalStrut(5)); // Reduced spacing for compactness
 
       // 4. Uninstall Section
       JPanel uninstallPanel = createUninstallPanel(project);
+      uninstallPanel.setAlignmentX(Component.LEFT_ALIGNMENT); // Top align
+      uninstallPanel.setMaximumSize(new Dimension(Integer.MAX_VALUE, 120)); // Fixed height
       mainPanel.add(uninstallPanel);
 
       // Add the panel to the tool window
@@ -252,7 +264,7 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
     contentPanel.setLayout(new BoxLayout(contentPanel, BoxLayout.Y_AXIS));
 
     // Create a grid layout for checkboxes
-    JPanel checkboxPanel = new JPanel(new GridLayout(0, 2, 10, 5));
+    JPanel checkboxPanel = new JPanel(new GridLayout(0, 2, 10, 2));
 
     JCheckBox checkbox1 = new JCheckBox("TON HTTP API v2");
     checkbox1.setToolTipText("Enables ton-http-api service on start.");
@@ -283,13 +295,13 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
 //                project, "Selected value: " + selectedValue, "MyLocalTon Plugin");
 //        }
 //    });
-    
+
+    // Add the "add validators" label next to the listbox
+    JLabel validatorsLabel = new JLabel("Validators:");
+    listboxPanel.add(validatorsLabel);
+
     // Add the listbox to the panel
     listboxPanel.add(listbox);
-    
-    // Add the "add validators" label next to the listbox
-    JLabel validatorsLabel = new JLabel("add validators");
-    listboxPanel.add(validatorsLabel);
     
     JCheckBox checkbox5 = new JCheckBox("Debug mode");
     checkbox5.setToolTipText("Launches MyLocalTon in debug mode that add lots of useful information into log files.");
@@ -321,9 +333,193 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
     centerPanel.setLayout(new BoxLayout(centerPanel, BoxLayout.Y_AXIS));
 
     // Create buttons
-    JButton startButton = createButton("Start", project, "Start operation initiated!");
+    JButton startButton = new JButton("Start");
+    startButton.addActionListener(
+        new ActionListener() {
+          @Override
+          public void actionPerformed(ActionEvent e) {
+            LOG.warn("Start button clicked");
+            
+            try {
+              // Get the path to the downloaded JAR file
+              Path downloadDir = Paths.get(System.getProperty("user.home"), ".mylocalton");
+              Path jarPath = downloadDir.resolve("MyLocalTon-x86-64.jar");
+              
+              if (!Files.exists(jarPath)) {
+                com.intellij.openapi.ui.Messages.showErrorDialog(
+                    project, 
+                    "MyLocalTon-x86-64.jar not found. Please download it first.", 
+                    "MyLocalTon Plugin");
+                return;
+              }
+              
+              // Build the command with parameters based on checkbox states
+              StringBuilder command = new StringBuilder();
+              command.append("java -jar \"").append(jarPath.toString()).append("\"");
+              
+              // Find the startup settings panel by iterating through the main panel's components
+              JPanel mainPanel = (JPanel) panel.getParent();
+              JPanel startupSettingsPanel = null;
+              
+              // Find the startup settings panel by its title
+              for (Component comp : mainPanel.getComponents()) {
+                if (comp instanceof JPanel) {
+                  JPanel panelComp = (JPanel) comp;
+                  if (panelComp.getBorder() instanceof TitledBorder) {
+                    TitledBorder border = (TitledBorder) panelComp.getBorder();
+                    if ("Startup settings".equals(border.getTitle())) {
+                      startupSettingsPanel = panelComp;
+                      break;
+                    }
+                  }
+                }
+              }
+              
+              if (startupSettingsPanel == null) {
+                throw new IllegalStateException("Could not find Startup settings panel");
+              }
+              
+              // Get the content panel (BorderLayout.CENTER)
+              JPanel contentPanel = null;
+              for (Component comp : startupSettingsPanel.getComponents()) {
+                if (comp instanceof JPanel) {
+                  contentPanel = (JPanel) comp;
+                  break;
+                }
+              }
+              
+              if (contentPanel == null) {
+                throw new IllegalStateException("Could not find content panel in Startup settings");
+              }
+              
+              // Get the checkbox panel
+              JPanel checkboxPanel = null;
+              for (Component comp : contentPanel.getComponents()) {
+                if (comp instanceof JPanel) {
+                  checkboxPanel = (JPanel) comp;
+                  break;
+                }
+              }
+              
+              if (checkboxPanel == null) {
+                throw new IllegalStateException("Could not find checkbox panel in Startup settings");
+              }
+              
+              // Get checkbox references
+              JCheckBox checkbox1 = null;
+              JCheckBox checkbox2 = null;
+              JCheckBox checkbox3 = null;
+              JCheckBox checkbox4 = null;
+              JCheckBox checkbox5 = null;
+              JComboBox<Integer> listbox = null;
+              
+              // Find the checkboxes and listbox by iterating through components
+              for (int i = 0; i < checkboxPanel.getComponentCount(); i++) {
+                Component comp = checkboxPanel.getComponent(i);
+                if (comp instanceof JCheckBox) {
+                  JCheckBox checkbox = (JCheckBox) comp;
+                  String text = checkbox.getText();
+                  
+                  if ("TON HTTP API v2".equals(text)) {
+                    checkbox1 = checkbox;
+                  } else if ("Web explorer".equals(text)) {
+                    checkbox2 = checkbox;
+                  } else if ("Data generator".equals(text)) {
+                    checkbox3 = checkbox;
+                  } else if ("No GUI mode".equals(text)) {
+                    checkbox4 = checkbox;
+                  } else if ("Debug mode".equals(text)) {
+                    checkbox5 = checkbox;
+                  }
+                } else if (comp instanceof JPanel) {
+                  // This should be the listbox panel
+                  JPanel listboxPanel = (JPanel) comp;
+                  for (Component listboxComp : listboxPanel.getComponents()) {
+                    if (listboxComp instanceof JComboBox) {
+                      listbox = (JComboBox<Integer>) listboxComp;
+                      break;
+                    }
+                  }
+                }
+              }
+              
+              // Verify we found all components
+              if (checkbox1 == null || checkbox2 == null || checkbox3 == null || 
+                  checkbox4 == null || checkbox5 == null || listbox == null) {
+                throw new IllegalStateException("Could not find all checkboxes and listbox");
+              }
+              
+              // Add parameters based on checkbox states
+              if (checkbox1.isSelected()) {
+                command.append(" ton-http-api");
+              }
+              if (checkbox2.isSelected()) {
+                command.append(" explorer");
+              }
+              if (checkbox3.isSelected()) {
+                command.append(" data-generator");
+              }
+              if (checkbox4.isSelected()) {
+                command.append(" nogui");
+              }
+              if (checkbox5.isSelected()) {
+                command.append(" debug");
+              }
+              
+              // Add validator parameter if listbox value is not 0
+              Integer selectedValue = (Integer) listbox.getSelectedItem();
+              if (selectedValue != null && selectedValue > 0) {
+                command.append(" with-validators-").append(selectedValue);
+              }
+              
+              // Execute the command
+              ProcessBuilder processBuilder = new ProcessBuilder();
+              
+              // Set the working directory to where the JAR is located
+              processBuilder.directory(downloadDir.toFile());
+              
+              // Set the command based on the OS
+              if (System.getProperty("os.name").toLowerCase().contains("win")) {
+                processBuilder.command("cmd.exe", "/c", command.toString());
+              } else {
+                processBuilder.command("sh", "-c", command.toString());
+              }
+              
+              // Redirect error stream to output stream
+              processBuilder.redirectErrorStream(true);
+              
+              // Start the process
+              Process process = processBuilder.start();
+              
+              // Show a message with the executed command
+              com.intellij.openapi.ui.Messages.showInfoMessage(
+                  project, 
+                  "Executing command: " + command.toString(), 
+                  "MyLocalTon Plugin");
+
+              String resultInput =
+                      IOUtils.toString(process.getInputStream(), Charset.defaultCharset());
+              LOG.warn("validator-engine-{} stopped "+ resultInput);
+              
+              // Update status label
+              JPanel southPanel = (JPanel) panel.getComponent(1);
+              JPanel rightPanel = (JPanel) southPanel.getComponent(1);
+              JLabel statusLabel = (JLabel) rightPanel.getComponent(0);
+              statusLabel.setText("Status: Running");
+              
+            } catch (Exception ex) {
+              LOG.warn("Error executing command: " + ex.getMessage(), ex);
+              com.intellij.openapi.ui.Messages.showErrorDialog(
+                  project,
+                  "Error executing command: " + ex.getMessage(),
+                  "MyLocalTon Plugin");
+            }
+          }
+        });
+    
     JButton stopButton = createButton("Stop", project, "Stop operation initiated!");
     JButton resetButton = createButton("Reset", project, "Reset operation initiated!");
+    resetButton.setToolTipText("Reset MyLocalTon to its default state");
 
     // Center-align buttons
     startButton.setAlignmentX(Component.CENTER_ALIGNMENT);
@@ -397,8 +593,58 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
           @Override
           public void actionPerformed(ActionEvent e) {
             LOG.warn("Delete button clicked");
-            com.intellij.openapi.ui.Messages.showInfoMessage(
-                project, "Delete operation initiated!", "MyLocalTon Plugin");
+            
+            // Confirm deletion with the user
+            int result = com.intellij.openapi.ui.Messages.showYesNoDialog(
+                project,
+                "Are you sure you want to delete MyLocalTon and all its data?",
+                "Confirm Deletion",
+                com.intellij.openapi.ui.Messages.getQuestionIcon());
+                
+            if (result == com.intellij.openapi.ui.Messages.YES) {
+              try {
+                // Get the path to the .mylocalton directory
+                Path mylocaltonDir = Paths.get(System.getProperty("user.home"), ".mylocalton");
+                
+                if (Files.exists(mylocaltonDir)) {
+                  try {
+                    // Delete all files and subdirectories inside the directory, but keep the directory itself
+                    FileUtils.cleanDirectory(mylocaltonDir.toFile());
+                    
+                    // If we get here, deletion was successful
+                    com.intellij.openapi.ui.Messages.showInfoMessage(
+                        project, 
+                        "MyLocalTon content has been successfully deleted from your computer.",
+                        "MyLocalTon Plugin");
+                        
+                    // Update the download button in the Installation panel
+                    JPanel mainPanel = (JPanel) panel.getParent();
+                    if (mainPanel != null) {
+                      updateDownloadButtonAfterDeletion(mainPanel);
+                    }
+                  } catch (IOException ex) {
+                    // If an IOException occurs, it means deletion failed
+                    LOG.warn("Failed to delete MyLocalTon content: " + ex.getMessage(), ex);
+                    com.intellij.openapi.ui.Messages.showErrorDialog(
+                        project,
+                        "Failed to delete MyLocalTon content. Please check if the MyLocalTon process is not running.",
+                        "Deletion Failed");
+                  }
+                } else {
+                  com.intellij.openapi.ui.Messages.showInfoMessage(
+                      project, 
+                      "MyLocalTon directory not found.",
+                      "MyLocalTon Plugin");
+                }
+              } catch (Exception ex) {
+                LOG.warn("Error deleting MyLocalTon content: " + ex.getMessage(), ex);
+                com.intellij.openapi.ui.Messages.showErrorDialog(
+                    project,
+                    "Error deleting MyLocalTon content: " + ex.getMessage() + 
+                    "\nPlease check if the MyLocalTon process is not running.",
+                    "Deletion Failed");
+              }
+            }
           }
         });
 
@@ -408,12 +654,84 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
     panel.add(buttonPanel, BorderLayout.CENTER);
 
     // Add label below Delete button, aligned to the right
-    JPanel southPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
-    JLabel uninstallStatusLabel = new JLabel("Status: Not uninstalled");
+    JPanel southPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+    // Create a multiline label with HTML to enable text wrapping
+    JLabel uninstallStatusLabel = new JLabel("<html><div style='width:250px; align:left;'>Completely removes MyLocalTon from your computer. You will have to download it again.</div></html>");
     southPanel.add(uninstallStatusLabel);
     panel.add(southPanel, BorderLayout.SOUTH);
 
     return panel;
+  }
+  
+  /**
+   * Updates the download button in the Installation panel after deletion.
+   *
+   * @param mainPanel The main panel containing all sections
+   */
+  private void updateDownloadButtonAfterDeletion(JPanel mainPanel) {
+    try {
+      // Find the installation panel
+      for (Component comp : mainPanel.getComponents()) {
+        if (comp instanceof JPanel) {
+          JPanel panelComp = (JPanel) comp;
+          if (panelComp.getBorder() instanceof TitledBorder) {
+            TitledBorder border = (TitledBorder) panelComp.getBorder();
+            if ("Installation".equals(border.getTitle())) {
+              // Found the installation panel
+              JPanel installationPanel = panelComp;
+              
+              // Find the top panel with the download button
+              Component northComp = ((BorderLayout) installationPanel.getLayout()).getLayoutComponent(BorderLayout.NORTH);
+              if (northComp instanceof JPanel) {
+                JPanel topPanel = (JPanel) northComp;
+                
+                // Find the button panel
+                if (topPanel.getComponentCount() > 0 && topPanel.getComponent(0) instanceof JPanel) {
+                  JPanel buttonPanel = (JPanel) topPanel.getComponent(0);
+                  
+                  // Find the download button
+                  for (Component buttonComp : buttonPanel.getComponents()) {
+                    if (buttonComp instanceof JButton) {
+                      JButton button = (JButton) buttonComp;
+                      if ("DOWNLOADED".equals(button.getText())) {
+                        // Reset the button
+                        button.setText("DOWNLOAD");
+                        button.setEnabled(true);
+                        break;
+                      }
+                    }
+                  }
+                }
+              }
+              
+              // Find the bottom panel to update the label
+              Component southComp = ((BorderLayout) installationPanel.getLayout()).getLayoutComponent(BorderLayout.SOUTH);
+              if (southComp instanceof JPanel) {
+                JPanel bottomPanel = (JPanel) southComp;
+                Component westComp = ((BorderLayout) bottomPanel.getLayout()).getLayoutComponent(BorderLayout.WEST);
+                
+                if (westComp instanceof JPanel) {
+                  JPanel leftPanel = (JPanel) westComp;
+                  
+                  // Remove any existing components (like the "Open Location" link)
+                  leftPanel.removeAll();
+                  
+                  // Add back the "Ready to download" label
+                  downloadedLabel = new JLabel("Ready to download.");
+                  leftPanel.add(downloadedLabel);
+                  leftPanel.revalidate();
+                  leftPanel.repaint();
+                }
+              }
+              
+              break;
+            }
+          }
+        }
+      }
+    } catch (Exception ex) {
+      LOG.warn("Error updating download button after deletion: " + ex.getMessage(), ex);
+    }
   }
 
   private JButton createButton(String text, Project project, String message) {
