@@ -294,14 +294,13 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
                               downloadButton.setEnabled(false);
                               testnetCheckbox.setEnabled(false);
 
-                              // Get the left panel to add the "Open Location" link
+                              // Get the bottom panel to add the "Open Location" link
                               JPanel bottomPanel = (JPanel) panel.getComponent(1); // Get the bottom panel
-                              JPanel leftPanel = (JPanel) ((BorderLayout) bottomPanel.getLayout()).getLayoutComponent(BorderLayout.WEST);
                               
-                              // Clear the left panel and add the "Open Location" link
-                              leftPanel.removeAll();
+                              // Clear the bottom panel and recreate it
+                              bottomPanel.removeAll();
                               
-                              // Add "Open Location" link
+                              // Add "Open Location" link to the left side
                               JLabel openLocationLink = createLink("Open Location", project, null);
                               openLocationLink.addMouseListener(
                                   new MouseAdapter() {
@@ -331,9 +330,22 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
                                       }
                                     }
                                   });
-                              leftPanel.add(openLocationLink);
-                              leftPanel.revalidate();
-                              leftPanel.repaint();
+                              
+                              // Recreate the bottom panel with the same BoxLayout
+                              bottomPanel.setLayout(new BoxLayout(bottomPanel, BoxLayout.X_AXIS));
+                              bottomPanel.add(openLocationLink);
+                              
+                              // Add flexible space to push the checkbox to the right
+                              bottomPanel.add(Box.createHorizontalGlue());
+                              
+                              // Add Testnet checkbox on the right
+                              bottomPanel.add(testnetCheckbox);
+                              
+                              // Add padding around the panel
+                              bottomPanel.setBorder(BorderFactory.createEmptyBorder(5, 10, 5, 10));
+                              
+                              bottomPanel.revalidate();
+                              bottomPanel.repaint();
 
                               com.intellij.openapi.ui.Messages.showInfoMessage(
                                   project,
@@ -346,16 +358,30 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
                             () -> {
                               progressBar.setVisible(false);
                               
-                              // Get the left panel to add the "Download failed" label
+                              // Get the bottom panel to add the "Download failed" label
                               JPanel bottomPanel = (JPanel) panel.getComponent(1); // Get the bottom panel
-                              JPanel leftPanel = (JPanel) ((BorderLayout) bottomPanel.getLayout()).getLayoutComponent(BorderLayout.WEST);
                               
-                              // Clear the left panel and add the "Download failed" label
-                              leftPanel.removeAll();
+                              // Clear the bottom panel and recreate it
+                              bottomPanel.removeAll();
+                              
+                              // Add "Download failed" label to the left side
                               JLabel failedLabel = new JLabel("Download failed.");
-                              leftPanel.add(failedLabel);
-                              leftPanel.revalidate();
-                              leftPanel.repaint();
+                              
+                              // Recreate the bottom panel with the same BoxLayout
+                              bottomPanel.setLayout(new BoxLayout(bottomPanel, BoxLayout.X_AXIS));
+                              bottomPanel.add(failedLabel);
+                              
+                              // Add flexible space to push the checkbox to the right
+                              bottomPanel.add(Box.createHorizontalGlue());
+                              
+                              // Add Testnet checkbox on the right
+                              bottomPanel.add(testnetCheckbox);
+                              
+                              // Add padding around the panel
+                              bottomPanel.setBorder(BorderFactory.createEmptyBorder(5, 10, 5, 10));
+                              
+                              bottomPanel.revalidate();
+                              bottomPanel.repaint();
                               
                               com.intellij.openapi.ui.Messages.showErrorDialog(
                                   project,
