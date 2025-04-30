@@ -380,13 +380,11 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
 
     panel.add(topPanel, BorderLayout.NORTH);
 
-    // Create bottom panel with FlowLayout
-    JPanel bottomPanel = new JPanel(new BorderLayout());
-
-    // Add download status label to the bottom left
-    JPanel leftPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+    // Create bottom panel with BoxLayout for horizontal alignment
+    JPanel bottomPanel = new JPanel();
+    bottomPanel.setLayout(new BoxLayout(bottomPanel, BoxLayout.X_AXIS));
     
-    // Set appropriate label based on JAR existence
+    // Add left component (Open Location link)
     if (jarExists) {
       // If JAR exists, show the "Open Location" link
       JLabel openLocationLink = createLink("Open Location", project, null);
@@ -418,16 +416,19 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
               }
             }
           });
-      leftPanel.add(openLocationLink);
-    } else {
-      // JAR doesn't exist, but we don't need to show any label
+      bottomPanel.add(openLocationLink);
+      // Add some horizontal padding
+      bottomPanel.add(Box.createHorizontalStrut(5));
     }
-    bottomPanel.add(leftPanel, BorderLayout.WEST);
-
-    // Add Testnet checkbox to the bottom right
-    JPanel rightPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
-    rightPanel.add(testnetCheckbox);
-    bottomPanel.add(rightPanel, BorderLayout.EAST);
+    
+    // Add flexible space to push the checkbox to the right
+    bottomPanel.add(Box.createHorizontalGlue());
+    
+    // Add Testnet checkbox on the right
+    bottomPanel.add(testnetCheckbox);
+    
+    // Add padding around the panel
+    bottomPanel.setBorder(BorderFactory.createEmptyBorder(5, 10, 5, 10));
 
     panel.add(bottomPanel, BorderLayout.SOUTH);
 
