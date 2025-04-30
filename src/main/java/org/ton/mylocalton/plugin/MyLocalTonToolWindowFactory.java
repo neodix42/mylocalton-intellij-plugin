@@ -114,7 +114,7 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
       // 3. Actions Section
       JPanel actionsPanel = createActionsPanel(project);
       actionsPanel.setAlignmentX(Component.LEFT_ALIGNMENT); // Top align
-      actionsPanel.setMaximumSize(new Dimension(Integer.MAX_VALUE, 180)); // Fixed height
+      actionsPanel.setMaximumSize(new Dimension(Integer.MAX_VALUE, 200)); // Fixed height
       mainPanel.add(actionsPanel);
       mainPanel.add(Box.createVerticalStrut(5)); // Reduced spacing for compactness
 
@@ -192,14 +192,30 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
             TitledBorder.LEFT,
             TitledBorder.TOP));
     
-    // Create testnet checkbox first so we can use it for file existence check
+    // Create testnet checkbox
     JCheckBox testnetCheckbox = new JCheckBox("Testnet");
     testnetCheckbox.setToolTipText("Download MyLocalTon based on TON binaries from testnet branch.");
             
-    // Check if JAR file exists
+    // Check if any JAR file exists (both mainnet and testnet versions for both architectures)
     Path downloadDir = Paths.get(System.getProperty("user.home"), ".mylocalton");
-    Path jarPath = downloadDir.resolve(getJarFilename(testnetCheckbox.isSelected()));
-    boolean jarExists = Files.exists(jarPath);
+    
+    // Check for mainnet JAR files
+    Path mainnetX86JarPath = downloadDir.resolve("MyLocalTon-x86-64.jar");
+    Path mainnetArmJarPath = downloadDir.resolve("MyLocalTon-arm64.jar");
+    
+    // Check for testnet JAR files
+    Path testnetX86JarPath = downloadDir.resolve("MyLocalTon-x86-64-testnet.jar");
+    Path testnetArmJarPath = downloadDir.resolve("MyLocalTon-arm64-testnet.jar");
+    
+    // Check if any JAR file exists
+    boolean mainnetJarExists = Files.exists(mainnetX86JarPath) || Files.exists(mainnetArmJarPath);
+    boolean testnetJarExists = Files.exists(testnetX86JarPath) || Files.exists(testnetArmJarPath);
+    boolean jarExists = mainnetJarExists || testnetJarExists;
+    
+    // If a testnet JAR exists, select the testnet checkbox
+    if (testnetJarExists) {
+        testnetCheckbox.setSelected(true);
+    }
 
     // Create top panel with centered Download button and progress bar
     JPanel topPanel = new JPanel();
@@ -476,9 +492,9 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
             TitledBorder.LEFT,
             TitledBorder.TOP));
 
-    // Create center panel with buttons
-    JPanel centerPanel = new JPanel();
-    centerPanel.setLayout(new BoxLayout(centerPanel, BoxLayout.Y_AXIS));
+    // Create buttons panel with vertical layout
+    JPanel buttonsPanel = new JPanel();
+    buttonsPanel.setLayout(new BoxLayout(buttonsPanel, BoxLayout.Y_AXIS));
 
     // Create buttons
     startButton = new JButton("Start");
@@ -568,40 +584,66 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
     resetButton.setMaximumSize(buttonSize);
 
     // Add buttons with spacing
-    centerPanel.add(Box.createVerticalGlue());
-    centerPanel.add(startButton);
-    centerPanel.add(Box.createVerticalStrut(10));
-    centerPanel.add(stopButton);
-    centerPanel.add(Box.createVerticalStrut(10));
-    centerPanel.add(resetButton);
-    centerPanel.add(Box.createVerticalGlue());
+    buttonsPanel.add(Box.createVerticalGlue());
+    buttonsPanel.add(startButton);
+    buttonsPanel.add(Box.createVerticalStrut(10));
+    buttonsPanel.add(stopButton);
+    buttonsPanel.add(Box.createVerticalStrut(10));
+    buttonsPanel.add(resetButton);
+    buttonsPanel.add(Box.createVerticalGlue());
 
-    panel.add(centerPanel, BorderLayout.CENTER);
+    panel.add(buttonsPanel, BorderLayout.CENTER);
 
-    // Create bottom panel with BorderLayout
-    JPanel southPanel = new JPanel(new BorderLayout());
-
-    // Add links to the bottom left
-    JPanel leftPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
-
-    // Create tonlib.dll link
+    // Create bottom panel with GridBagLayout for precise positioning
+    JPanel southPanel = new JPanel(new GridBagLayout());
+    
+    // Create a panel with BoxLayout for vertical arrangement of links
+    JPanel linksPanel = new JPanel();
+    linksPanel.setLayout(new BoxLayout(linksPanel, BoxLayout.Y_AXIS));
+    
+    // Create the links
     JLabel tonlibLink = createLink("tonlib.dll", project, "tonlib.dll clicked");
-    leftPanel.add(tonlibLink);
-
-    // Add spacing between links
-    leftPanel.add(Box.createHorizontalStrut(10));
-
-    // Create global.config.json link
     JLabel configLink = createLink("global.config.json", project, "global.config.json clicked");
-    leftPanel.add(configLink);
-
-    southPanel.add(leftPanel, BorderLayout.WEST);
-
-    // Add status label to the bottom right
-    JPanel rightPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+    JLabel myLocalTonLogLink = createLink("myLocalTon.log", project, "myLocalTon.log clicked");
+    
+    // Create panels with left alignment for each link and minimal vertical padding
+    JPanel firstLinkPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 5, 0));
+    firstLinkPanel.add(tonlibLink);
+    
+    JPanel secondLinkPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 5, 0));
+    secondLinkPanel.add(configLink);
+    
+    JPanel thirdLinkPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 5, 0));
+    thirdLinkPanel.add(myLocalTonLogLink);
+    
+    // Add all panels to the linksPanel vertically with minimal spacing
+    linksPanel.add(firstLinkPanel);
+    linksPanel.add(Box.createVerticalStrut(1)); // Minimal vertical spacing
+    linksPanel.add(secondLinkPanel);
+    linksPanel.add(Box.createVerticalStrut(1)); // Minimal vertical spacing
+    linksPanel.add(thirdLinkPanel);
+    
+    // Create constraints for the links panel (bottom left)
+    GridBagConstraints linkConstraints = new GridBagConstraints();
+    linkConstraints.gridx = 0;
+    linkConstraints.gridy = 0;
+    linkConstraints.anchor = GridBagConstraints.SOUTHWEST;
+    linkConstraints.weightx = 1.0;
+    linkConstraints.weighty = 1.0;
+    southPanel.add(linksPanel, linkConstraints);
+    
+    // Create status label
     statusLabel = new JLabel("Status: Ready");
-    rightPanel.add(statusLabel);
-    southPanel.add(rightPanel, BorderLayout.EAST);
+    
+    // Create constraints for the status label (bottom right)
+    GridBagConstraints statusConstraints = new GridBagConstraints();
+    statusConstraints.gridx = 1;
+    statusConstraints.gridy = 0;
+    statusConstraints.anchor = GridBagConstraints.SOUTHEAST;
+    statusConstraints.weightx = 0.0;
+    statusConstraints.weighty = 1.0;
+    statusConstraints.insets = new Insets(0, 0, 5, 10); // Add some padding at the bottom and right
+    southPanel.add(statusLabel, statusConstraints);
     
     // Initial check of lock file status and update button states
     updateStatusLabel();
