@@ -37,6 +37,7 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
   private JButton startButton;
   private JButton stopButton;
   private JButton resetButton;
+  private JButton deleteButton;
   private JPanel startupSettingsPanel;
   private JCheckBox testnetCheckbox; // Reference to the testnet checkbox
   private JButton downloadButton;
@@ -86,10 +87,6 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
       stopButton.setEnabled(lockExists); // Disable Stop when lock doesn't exist
     }
 
-    if (resetButton != null) {
-      resetButton.setEnabled(!lockExists); // Disable Reset when lock doesn't exist
-    }
-
     // Disable/enable the startup settings panel based on lock file existence
     if (startupSettingsPanel != null) {
       startupSettingsPanel.setEnabled(!lockExists); // Disable when lock exists
@@ -125,7 +122,7 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
       // 3. Actions Section
       JPanel actionsPanel = createActionsPanel(project);
       actionsPanel.setAlignmentX(Component.LEFT_ALIGNMENT); // Top align
-      actionsPanel.setMaximumSize(new Dimension(Integer.MAX_VALUE, 230)); // Fixed height
+      actionsPanel.setMaximumSize(new Dimension(Integer.MAX_VALUE, 200)); // Fixed height
       mainPanel.add(actionsPanel);
       mainPanel.add(Box.createVerticalStrut(5)); // Reduced spacing for compactness
 
@@ -736,30 +733,23 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
             LOG.warn("No process to stop");
           }
         });
-    resetButton = createResetButton("Reset", project);
-    resetButton.setToolTipText("Reset MyLocalTon to its default state");
 
     // Center-align buttons
     startButton.setAlignmentX(Component.CENTER_ALIGNMENT);
     stopButton.setAlignmentX(Component.CENTER_ALIGNMENT);
-    resetButton.setAlignmentX(Component.CENTER_ALIGNMENT);
 
     // Set preferred size for buttons
     Dimension buttonSize = new Dimension(150, 30);
     startButton.setPreferredSize(buttonSize);
     stopButton.setPreferredSize(buttonSize);
-    resetButton.setPreferredSize(buttonSize);
     startButton.setMaximumSize(buttonSize);
     stopButton.setMaximumSize(buttonSize);
-    resetButton.setMaximumSize(buttonSize);
 
     // Add buttons with spacing
     buttonsPanel.add(Box.createVerticalGlue());
     buttonsPanel.add(startButton);
     buttonsPanel.add(Box.createVerticalStrut(10));
     buttonsPanel.add(stopButton);
-    buttonsPanel.add(Box.createVerticalStrut(10));
-    buttonsPanel.add(resetButton);
     buttonsPanel.add(Box.createVerticalGlue());
 
     panel.add(buttonsPanel, BorderLayout.CENTER);
@@ -961,9 +951,18 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
             TitledBorder.LEFT,
             TitledBorder.TOP));
 
-    // Delete button
-    JButton deleteButton = new JButton("Delete");
+    // Create a panel for buttons with FlowLayout to place them side by side
+    JPanel buttonPanel = new JPanel();
+    
+    // Create Reset button
+    resetButton = createResetButton("Reset", project);
+    resetButton.setToolTipText("<html>Deletes only current state of the blockchain<br>and allows to start new blockchain from scratch.</html>");
+    resetButton.setPreferredSize(new Dimension(150, 30));
+    
+    // Create Delete button
+    deleteButton = new JButton("Delete");
     deleteButton.setPreferredSize(new Dimension(150, 30));
+    deleteButton.setToolTipText("<html>Completely removes MyLocalTon from your computer.<br>You will have to download it again.</html>");
     deleteButton.addActionListener(
         new ActionListener() {
           @Override
@@ -1025,19 +1024,16 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
           }
         });
 
-    // Center the button
-    JPanel buttonPanel = new JPanel();
+    // Add Reset button to the left
+    buttonPanel.add(resetButton);
+    
+    // Add some space between buttons
+    buttonPanel.add(Box.createHorizontalStrut(10));
+    
+    // Add Delete button to the right
     buttonPanel.add(deleteButton);
+    
     panel.add(buttonPanel, BorderLayout.CENTER);
-
-    // Add label below Delete button, aligned to the right
-    JPanel southPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
-    // Create a multiline label with HTML to enable text wrapping
-    JLabel uninstallStatusLabel =
-        new JLabel(
-            "<html><div style='width:250px; align:left;'>Completely removes MyLocalTon from your computer. You will have to download it again.</div></html>");
-    southPanel.add(uninstallStatusLabel);
-    panel.add(southPanel, BorderLayout.SOUTH);
 
     return panel;
   }
