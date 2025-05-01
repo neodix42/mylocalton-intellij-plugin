@@ -641,19 +641,44 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
               
               if (process != null) {
                 try {
-                  // Get the process ID
-                  long pid = process.pid();
-//                  LOG.warn("Sending SIGTERM to process with PID: " + pid);
-                  
-                  // Use platform-specific commands to send SIGTERM
+                  // Get the operating system
                   String osName = System.getProperty("os.name").toLowerCase();
+                  
                   if (osName.contains("win")) {
-                    String p = Paths.get(System.getProperty("user.home"), ".mylocalton/myLocalTon/utils/SendSignalCtrlC64.exe").toString();
-                    LOG.warn("Sending SIGTERM : " +p+" "+ pid);
-                    Runtime.getRuntime().exec(p+" " + pid);
+                      // Windows: Use WMIC command to find all process IDs
+                      String jarFilename = getJarFilename(testnetCheckbox.isSelected());
+                      String wmiCommand = "wmic process where \"CommandLine like '%%"+jarFilename+"%%'\" get ProcessId";
+                      LOG.warn("WMI command: " + wmiCommand);
+                      Process wmiProcess = Runtime.getRuntime().exec(wmiCommand);
+                      String output = IOUtils.toString(wmiProcess.getInputStream(), Charset.defaultCharset());
+                      wmiProcess.waitFor();
+                      
+                      // Parse the output to get all process IDs
+                      String[] lines = output.trim().split("\\s+");
+                      java.util.List<Long> pids = new java.util.ArrayList<>();
+                      for (String line : lines) {
+                          if (line.matches("\\d+")) {
+                              pids.add(Long.parseLong(line));
+                          }
+                      }
+                      
+                      LOG.warn("Found " + pids.size() + " processes to terminate");
+                      
+                      // Get the path to the SendSignalCtrlC64.exe utility
+                      String p = Paths.get(System.getProperty("user.home"), ".mylocalton/myLocalTon/utils/SendSignalCtrlC64.exe").toString();
+                      
+                      // Terminate each process
+                      for (Long pid : pids) {
+                          LOG.warn("Sending SIGTERM : " + p + " " + pid);
+                          Runtime.getRuntime().exec(p + " " + pid);
+                      }
                   } else {
-                    // For Unix-based systems, use kill -15 (SIGTERM)
-                    Runtime.getRuntime().exec("kill -15 " + pid);
+                      // Non-Windows: Use process.pid() to get the process ID
+                      long pid = process.pid();
+                      LOG.warn("Terminating process with PID: " + pid);
+                      
+                      // For Unix-based systems, use kill -15 (SIGTERM)
+                      Runtime.getRuntime().exec("kill -15 " + pid);
                   }
                   
                   // Wait for the process to terminate
