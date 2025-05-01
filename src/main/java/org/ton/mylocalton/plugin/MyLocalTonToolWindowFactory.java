@@ -41,6 +41,14 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
   private JCheckBox testnetCheckbox; // Reference to the testnet checkbox
   private JButton downloadButton;
   private Process process;
+  
+  // References to startup settings checkboxes and combobox
+  private JCheckBox tonHttpApiV2;
+  private JCheckBox webExplorer;
+  private JCheckBox dataGenerator;
+  private JCheckBox noGuiMode;
+  private JCheckBox debugMode;
+  private JComboBox<Integer> validators;
 
   static {
     LOG.warn("DemoToolWindowFactory class loaded");
@@ -476,44 +484,45 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
     // Create a grid layout for checkboxes
     JPanel checkboxPanel = new JPanel(new GridLayout(0, 2, 10, 2));
 
-    JCheckBox checkbox1 = new JCheckBox("TON HTTP API v2");
-    checkbox1.setToolTipText("Enables ton-http-api service on start.");
-    JCheckBox checkbox2 = new JCheckBox("Web explorer");
-    checkbox2.setToolTipText("Enables native TON blockchain web explorer on start.");
-    JCheckBox checkbox3 = new JCheckBox("Data generator");
-    checkbox3.setToolTipText("Enables dummy data-generator on start.");
-    JCheckBox checkbox4 = new JCheckBox("No GUI mode");
-    checkbox4.setToolTipText("Launches MyLocalTon without GUI.");
+    // Initialize the checkboxes and combobox as class variables
+    tonHttpApiV2 = new JCheckBox("TON HTTP API v2");
+    tonHttpApiV2.setToolTipText("Enables ton-http-api service on start.");
+    webExplorer = new JCheckBox("Web explorer");
+    webExplorer.setToolTipText("Enables native TON blockchain web explorer on start.");
+    dataGenerator = new JCheckBox("Data generator");
+    dataGenerator.setToolTipText("Enables dummy data-generator on start.");
+    noGuiMode = new JCheckBox("No GUI mode");
+    noGuiMode.setToolTipText("Launches MyLocalTon without GUI.");
 
     // Create a panel for the listbox and label to be placed below "No GUI mode"
     JPanel listboxPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
 
     // Create a listbox (JComboBox) with numbers 0 to 5
     Integer[] numbers = {0, 1, 2, 3, 4, 5};
-    JComboBox<Integer> listbox = new JComboBox<>(numbers);
+    validators = new JComboBox<>(numbers);
 
     // Make the combobox width two times smaller
-    Dimension comboBoxSize = listbox.getPreferredSize();
+    Dimension comboBoxSize = validators.getPreferredSize();
     comboBoxSize.width = comboBoxSize.width - 20;
-    listbox.setPreferredSize(comboBoxSize);
+    validators.setPreferredSize(comboBoxSize);
 
     // Add the "add validators" label next to the listbox
     JLabel validatorsLabel = new JLabel("Validators:");
     listboxPanel.add(validatorsLabel);
 
     // Add the listbox to the panel
-    listboxPanel.add(listbox);
+    listboxPanel.add(validators);
 
-    JCheckBox checkbox5 = new JCheckBox("Debug mode");
-    checkbox5.setToolTipText(
+    debugMode = new JCheckBox("Debug mode");
+    debugMode.setToolTipText(
         "Launches MyLocalTon in debug mode that add lots of useful information into log files.");
 
-    checkboxPanel.add(checkbox1);
-    checkboxPanel.add(checkbox2);
-    checkboxPanel.add(checkbox3);
-    checkboxPanel.add(checkbox4);
+    checkboxPanel.add(tonHttpApiV2);
+    checkboxPanel.add(webExplorer);
+    checkboxPanel.add(dataGenerator);
+    checkboxPanel.add(noGuiMode);
     checkboxPanel.add(listboxPanel);
-    checkboxPanel.add(checkbox5);
+    checkboxPanel.add(debugMode);
 
     contentPanel.add(checkboxPanel);
     panel.add(contentPanel, BorderLayout.CENTER);
@@ -567,22 +576,46 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
               // Build the command with parameters based on checkbox states
               StringBuilder command = new StringBuilder();
               command.append("java -jar \"").append(jarPath).append("\"");
-
-              // Execute the command
-              ProcessBuilder processBuilder = new ProcessBuilder();
-
-              // Set the working directory to where the JAR is located
-              processBuilder.directory(downloadDir.toFile());
-
-              // Set the command based on the OS
-              if (System.getProperty("os.name").toLowerCase().contains("win")) {
-                processBuilder.command("cmd.exe", "/c", command.toString());
-              } else {
-                processBuilder.command("sh", "-c", command.toString());
+              
+              // Add parameters based on checkbox states
+              if (tonHttpApiV2.isSelected()) {
+                command.append(" ton-http-api");
+              }
+              if (webExplorer.isSelected()) {
+                command.append(" explorer");
+              }
+              if (dataGenerator.isSelected()) {
+                command.append(" data-generator");
+              }
+              if (noGuiMode.isSelected()) {
+                command.append(" nogui");
+              }
+              if (debugMode.isSelected()) {
+                command.append(" debug");
+              }
+              
+              // Add validators parameter if not 0
+              int validatorsCount = (Integer) validators.getSelectedItem();
+              if (validatorsCount > 0) {
+                command.append(" with-validators-").append(validatorsCount);
               }
 
-              // Redirect error stream to output stream
-              processBuilder.redirectErrorStream(true);
+
+//              // Execute the command
+//              ProcessBuilder processBuilder = new ProcessBuilder();
+//
+//              // Set the working directory to where the JAR is located
+//              processBuilder.directory(downloadDir.toFile());
+//
+//              // Set the command based on the OS
+//              if (System.getProperty("os.name").toLowerCase().contains("win")) {
+//                processBuilder.command("cmd.exe", "/c", command.toString());
+//              } else {
+//                processBuilder.command("sh", "-c", command.toString());
+//              }
+//
+//              // Redirect error stream to output stream
+//              processBuilder.redirectErrorStream(true);
 
               // Launch the process in a detached way without console window
               String osName = System.getProperty("os.name").toLowerCase();
@@ -604,10 +637,12 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
               if (osName.contains("win")) {
                 // For Windows, use javaw instead of java to avoid console window
                 String javawCommand = command.toString().replace("java ", "javaw ");
+                LOG.warn("Starting MyLocalTon with command: " + javawCommand);
                 invisibleProcessBuilder.command("cmd.exe", "/c", javawCommand);
               } else {
                 // For macOS and Linux, use java with appropriate flags
-                invisibleProcessBuilder.command("sh", "-c", command.toString() + " &");
+                LOG.warn("Starting MyLocalTon with command: " + command);
+                invisibleProcessBuilder.command("sh", "-c", command + " &");
               }
 
               // Start the process and immediately detach from it
