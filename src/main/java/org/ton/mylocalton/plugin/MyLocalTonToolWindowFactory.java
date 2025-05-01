@@ -600,23 +600,6 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
                 command.append(" with-validators-").append(validatorsCount);
               }
 
-
-//              // Execute the command
-//              ProcessBuilder processBuilder = new ProcessBuilder();
-//
-//              // Set the working directory to where the JAR is located
-//              processBuilder.directory(downloadDir.toFile());
-//
-//              // Set the command based on the OS
-//              if (System.getProperty("os.name").toLowerCase().contains("win")) {
-//                processBuilder.command("cmd.exe", "/c", command.toString());
-//              } else {
-//                processBuilder.command("sh", "-c", command.toString());
-//              }
-//
-//              // Redirect error stream to output stream
-//              processBuilder.redirectErrorStream(true);
-
               // Launch the process in a detached way without console window
               String osName = System.getProperty("os.name").toLowerCase();
 
@@ -753,7 +736,7 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
             LOG.warn("No process to stop");
           }
         });
-    resetButton = createButton("Reset", project, "Reset operation initiated!");
+    resetButton = createResetButton("Reset", project);
     resetButton.setToolTipText("Reset MyLocalTon to its default state");
 
     // Center-align buttons
@@ -1091,16 +1074,91 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
     }
   }
 
-  private JButton createButton(String text, Project project, String message) {
+  private JButton createResetButton(String text, Project project) {
     JButton button = new JButton(text);
     button.addActionListener(
-        new ActionListener() {
-          @Override
-          public void actionPerformed(ActionEvent e) {
-            LOG.warn(text + " button clicked");
-            com.intellij.openapi.ui.Messages.showInfoMessage(project, message, "MyLocalTon Plugin");
-          }
-        });
+            e -> {
+              LOG.warn("reset button clicked");
+              try {
+                // Get the path to the downloaded JAR file
+                Path downloadDir = Paths.get(System.getProperty("user.home"), ".mylocalton");
+
+                // Check for any of the possible JAR files
+                String jarFilename = getJarFilename(false); // Try mainnet first
+                Path jarPath = downloadDir.resolve(jarFilename);
+
+                if (!Files.exists(jarPath)) {
+                  // Try testnet version
+                  jarFilename = getJarFilename(true);
+                  jarPath = downloadDir.resolve(jarFilename);
+                }
+
+                if (!Files.exists(jarPath)) {
+                  com.intellij.openapi.ui.Messages.showErrorDialog(
+                          project,
+                          "MyLocalTon JAR file not found. Please download it first.",
+                          "MyLocalTon Plugin");
+                  return;
+                }
+
+                // Build the command with parameters based on checkbox states
+                StringBuilder command = new StringBuilder();
+                command.append("java -jar \"").append(jarPath).append("\"");
+                command.append(" restart");
+
+                // Launch the process in a detached way without console window
+                String osName = System.getProperty("os.name").toLowerCase();
+
+                // Create a ProcessBuilder for launching without console
+                ProcessBuilder invisibleProcessBuilder = new ProcessBuilder();
+
+                // Set the working directory to where the JAR is located
+                invisibleProcessBuilder.directory(downloadDir.toFile());
+
+                // Redirect standard output and error to /dev/null or NUL
+                invisibleProcessBuilder.redirectOutput(
+                        ProcessBuilder.Redirect.to(
+                                new File(osName.contains("win") ? "NUL" : "/dev/null")));
+                invisibleProcessBuilder.redirectError(
+                        ProcessBuilder.Redirect.to(
+                                new File(osName.contains("win") ? "NUL" : "/dev/null")));
+
+                if (osName.contains("win")) {
+                  // For Windows, use javaw instead of java to avoid console window
+                  String javawCommand = command.toString().replace("java ", "javaw ");
+                  LOG.warn("Starting MyLocalTon with command: " + javawCommand);
+                  invisibleProcessBuilder.command("cmd.exe", "/c", javawCommand);
+                } else {
+                  // For macOS and Linux, use java with appropriate flags
+                  LOG.warn("Starting MyLocalTon with command: " + command);
+                  invisibleProcessBuilder.command("sh", "-c", command + " &");
+                }
+
+                // Start the process and immediately detach from it
+                process = invisibleProcessBuilder.start();
+                process.getInputStream().close();
+                process.getOutputStream().close();
+                process.getErrorStream().close();
+
+                // For extra safety, start a thread to ensure we don't wait for the process
+                new Thread(
+                        () -> {
+                          try {
+                            process.waitFor(100, java.util.concurrent.TimeUnit.MILLISECONDS);
+                          } catch (Exception ex) {
+                            // Ignore any exceptions
+                          }
+                        })
+                        .start();
+
+                showCopiedMessage("Resetting...");
+
+              } catch (Exception ex) {
+                LOG.warn("Error executing command: " + ex.getMessage(), ex);
+                com.intellij.openapi.ui.Messages.showErrorDialog(
+                        project, "Error executing command: " + ex.getMessage(), "MyLocalTon Plugin");
+              }
+            });
     return button;
   }
 
