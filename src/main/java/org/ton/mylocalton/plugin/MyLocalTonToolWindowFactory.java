@@ -585,15 +585,43 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
               // Redirect error stream to output stream
               processBuilder.redirectErrorStream(true);
               
-              // Start the process
-              process = processBuilder.start();
+              // Launch the process in a detached way without console window
+              String osName = System.getProperty("os.name").toLowerCase();
               
-//              // Show a message with the executed command
-//              com.intellij.openapi.ui.Messages.showInfoMessage(
-//                  project,
-//                  "Executing command: " + command.toString(),
-//                  "MyLocalTon Plugin");
-
+              // Create a ProcessBuilder for launching without console
+              ProcessBuilder invisibleProcessBuilder = new ProcessBuilder();
+              
+              // Set the working directory to where the JAR is located
+              invisibleProcessBuilder.directory(downloadDir.toFile());
+              
+              // Redirect standard output and error to /dev/null or NUL
+              invisibleProcessBuilder.redirectOutput(ProcessBuilder.Redirect.to(new File(osName.contains("win") ? "NUL" : "/dev/null")));
+              invisibleProcessBuilder.redirectError(ProcessBuilder.Redirect.to(new File(osName.contains("win") ? "NUL" : "/dev/null")));
+              
+              if (osName.contains("win")) {
+                // For Windows, use javaw instead of java to avoid console window
+                String javawCommand = command.toString().replace("java ", "javaw ");
+                invisibleProcessBuilder.command("cmd.exe", "/c", javawCommand);
+              } else {
+                // For macOS and Linux, use java with appropriate flags
+                invisibleProcessBuilder.command("sh", "-c", command.toString() + " &");
+              }
+              
+              // Start the process and immediately detach from it
+              process = invisibleProcessBuilder.start();
+              process.getInputStream().close();
+              process.getOutputStream().close();
+              process.getErrorStream().close();
+              
+              // For extra safety, start a thread to ensure we don't wait for the process
+              new Thread(() -> {
+                try {
+                  process.waitFor(100, java.util.concurrent.TimeUnit.MILLISECONDS);
+                } catch (Exception ex) {
+                  // Ignore any exceptions
+                }
+              }).start();
+              
               showCopiedMessage("Starting...");
               
             } catch (Exception ex) {
@@ -610,8 +638,49 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
     stopButton.addActionListener(
             e -> {
               LOG.warn("Stop button clicked");
-
-              process.destroy();
+              
+              if (process != null) {
+                try {
+                  // Get the process ID
+                  long pid = process.pid();
+//                  LOG.warn("Sending SIGTERM to process with PID: " + pid);
+                  
+                  // Use platform-specific commands to send SIGTERM
+                  String osName = System.getProperty("os.name").toLowerCase();
+                  if (osName.contains("win")) {
+                    String p = Paths.get(System.getProperty("user.home"), ".mylocalton/myLocalTon/utils/SendSignalCtrlC64.exe").toString();
+                    LOG.warn("Sending SIGTERM : " +p+" "+ pid);
+                    Runtime.getRuntime().exec(p+" " + pid);
+                  } else {
+                    // For Unix-based systems, use kill -15 (SIGTERM)
+                    Runtime.getRuntime().exec("kill -15 " + pid);
+                  }
+                  
+                  // Wait for the process to terminate
+                  boolean terminated = process.waitFor(5, java.util.concurrent.TimeUnit.SECONDS);
+                  
+                  if (!terminated) {
+                    LOG.warn("Process did not terminate after SIGTERM, forcing destruction");
+                    // If the process didn't terminate, use destroyForcibly()
+                    process.destroyForcibly();
+                  } else {
+                    LOG.warn("Process terminated gracefully after SIGTERM");
+                  }
+                  
+                  process = null;
+                  updateStatusLabel();
+                } catch (Exception ex) {
+                  LOG.warn("Error stopping process: " + ex.getMessage(), ex);
+                  // If an exception occurred, try one more time with destroyForcibly()
+                  if (process != null) {
+                    process.destroyForcibly();
+                    process = null;
+                    updateStatusLabel();
+                  }
+                }
+              } else {
+                LOG.warn("No process to stop");
+              }
             });
     resetButton = createButton("Reset", project, "Reset operation initiated!");
     resetButton.setToolTipText("Reset MyLocalTon to its default state");
