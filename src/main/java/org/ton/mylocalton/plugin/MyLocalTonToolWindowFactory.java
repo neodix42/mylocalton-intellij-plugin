@@ -5,10 +5,6 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.wm.ToolWindow;
 import com.intellij.openapi.wm.ToolWindowFactory;
 import com.intellij.ui.content.ContentFactory;
-import org.apache.commons.io.FileUtils;
-import org.apache.commons.io.IOUtils;
-import org.jetbrains.annotations.NotNull;
-
 import java.awt.*;
 import java.awt.datatransfer.StringSelection;
 import java.awt.event.ActionEvent;
@@ -27,6 +23,9 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import javax.swing.*;
 import javax.swing.border.TitledBorder;
+import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.IOUtils;
+import org.jetbrains.annotations.NotNull;
 
 /** Factory for creating the Demo Tool Window. */
 public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
@@ -46,10 +45,10 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
   static {
     LOG.warn("DemoToolWindowFactory class loaded");
   }
-  
+
   /**
    * Checks if the myLocalTon.lock file exists in the user.dir directory.
-   * 
+   *
    * @return true if the lock file exists, false otherwise
    */
   private boolean isLockFileExists() {
@@ -57,13 +56,11 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
     Path lockFilePath = Paths.get(userDir, "myLocalTon.lock");
     return Files.exists(lockFilePath);
   }
-  
-  /**
-   * Updates the status label, button states, and panel states based on the lock file existence.
-   */
+
+  /** Updates the status label, button states, and panel states based on the lock file existence. */
   private void updateStatusLabel() {
     boolean lockExists = isLockFileExists();
-    
+
     if (statusLabel != null) {
       if (lockExists) {
         statusLabel.setText("Status: running");
@@ -71,24 +68,24 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
         statusLabel.setText("Status: not running");
       }
     }
-    
+
     // Update button states based on lock file existence
     if (startButton != null) {
       startButton.setEnabled(!lockExists); // Disable Start when lock exists
     }
-    
+
     if (stopButton != null) {
       stopButton.setEnabled(lockExists); // Disable Stop when lock doesn't exist
     }
-    
+
     if (resetButton != null) {
       resetButton.setEnabled(lockExists); // Disable Reset when lock doesn't exist
     }
-    
+
     // Disable/enable the startup settings panel based on lock file existence
     if (startupSettingsPanel != null) {
       startupSettingsPanel.setEnabled(!lockExists); // Disable when lock exists
-      
+
       // Recursively disable/enable all components inside the panel
       setEnabledRecursively(startupSettingsPanel, !lockExists);
     }
@@ -137,12 +134,15 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
       toolWindow.getContentManager().addContent(content);
 
       // Start the timer to check the lock file status every 5 seconds
-      lockFileMonitor = new Timer(5000, new ActionListener() {
-        @Override
-        public void actionPerformed(ActionEvent e) {
-          updateStatusLabel();
-        }
-      });
+      lockFileMonitor =
+          new Timer(
+              5000,
+              new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent e) {
+                  updateStatusLabel();
+                }
+              });
       lockFileMonitor.setInitialDelay(0);
       lockFileMonitor.start();
 
@@ -154,33 +154,33 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
 
   /**
    * Determines if the system is running on ARM architecture.
-   * 
+   *
    * @return true if running on ARM architecture, false otherwise (likely x86-64)
    */
   private boolean isArmArchitecture() {
     String arch = System.getProperty("os.arch").toLowerCase();
     return arch.contains("arm") || arch.contains("aarch");
   }
-  
+
   /**
    * Gets the appropriate JAR filename based on architecture and testnet selection.
-   * 
+   *
    * @param isTestnet Whether testnet is selected
    * @return The appropriate JAR filename
    */
   private String getJarFilename(boolean isTestnet) {
     boolean isArm = isArmArchitecture();
-    
+
     if (isArm) {
       return isTestnet ? "MyLocalTon-arm64-testnet.jar" : "MyLocalTon-arm64.jar";
     } else {
       return isTestnet ? "MyLocalTon-x86-64-testnet.jar" : "MyLocalTon-x86-64.jar";
     }
   }
-  
+
   /**
    * Gets the download URL for the JAR file based on architecture and testnet selection.
-   * 
+   *
    * @param isTestnet Whether testnet is selected
    * @return The URL to download the JAR file from
    */
@@ -201,27 +201,28 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
     downloadButton = new JButton();
     // Create testnet checkbox
     testnetCheckbox = new JCheckBox("Testnet");
-    testnetCheckbox.setToolTipText("Download MyLocalTon based on TON binaries from testnet branch.");
-            
+    testnetCheckbox.setToolTipText(
+        "Download MyLocalTon based on TON binaries from testnet branch.");
+
     // Check if any JAR file exists (both mainnet and testnet versions for both architectures)
     Path downloadDir = Paths.get(System.getProperty("user.home"), ".mylocalton");
-    
+
     // Check for mainnet JAR files
     Path mainnetX86JarPath = downloadDir.resolve("MyLocalTon-x86-64.jar");
     Path mainnetArmJarPath = downloadDir.resolve("MyLocalTon-arm64.jar");
-    
+
     // Check for testnet JAR files
     Path testnetX86JarPath = downloadDir.resolve("MyLocalTon-x86-64-testnet.jar");
     Path testnetArmJarPath = downloadDir.resolve("MyLocalTon-arm64-testnet.jar");
-    
+
     // Check if any JAR file exists
     boolean mainnetJarExists = Files.exists(mainnetX86JarPath) || Files.exists(mainnetArmJarPath);
     boolean testnetJarExists = Files.exists(testnetX86JarPath) || Files.exists(testnetArmJarPath);
     boolean jarExists = mainnetJarExists || testnetJarExists;
-    
+
     // If a testnet JAR exists, select the testnet checkbox
     if (testnetJarExists) {
-        testnetCheckbox.setSelected(true);
+      testnetCheckbox.setSelected(true);
     }
 
     // Create top panel with centered Download button and progress bar
@@ -255,7 +256,7 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
 
             // Get testnet checkbox state
             boolean isTestnet = testnetCheckbox.isSelected();
-            
+
             // Make progress bar visible when Download button is clicked
             progressBar.setVisible(true);
 
@@ -295,11 +296,12 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
                               testnetCheckbox.setEnabled(false);
 
                               // Get the bottom panel to add the "Open Location" link
-                              JPanel bottomPanel = (JPanel) panel.getComponent(1); // Get the bottom panel
-                              
+                              JPanel bottomPanel =
+                                  (JPanel) panel.getComponent(1); // Get the bottom panel
+
                               // Clear the bottom panel and recreate it
                               bottomPanel.removeAll();
-                              
+
                               // Add "Open Location" link to the left side
                               JLabel openLocationLink = createLink("Open Location", project, null);
                               openLocationLink.addMouseListener(
@@ -330,20 +332,20 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
                                       }
                                     }
                                   });
-                              
+
                               // Recreate the bottom panel with the same BoxLayout
                               bottomPanel.setLayout(new BoxLayout(bottomPanel, BoxLayout.X_AXIS));
                               bottomPanel.add(openLocationLink);
-                              
+
                               // Add flexible space to push the checkbox to the right
                               bottomPanel.add(Box.createHorizontalGlue());
-                              
+
                               // Add Testnet checkbox on the right
                               bottomPanel.add(testnetCheckbox);
-                              
+
                               // Add padding around the panel
                               bottomPanel.setBorder(BorderFactory.createEmptyBorder(5, 10, 5, 10));
-                              
+
                               bottomPanel.revalidate();
                               bottomPanel.repaint();
 
@@ -357,32 +359,33 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
                         SwingUtilities.invokeLater(
                             () -> {
                               progressBar.setVisible(false);
-                              
+
                               // Get the bottom panel to add the "Download failed" label
-                              JPanel bottomPanel = (JPanel) panel.getComponent(1); // Get the bottom panel
-                              
+                              JPanel bottomPanel =
+                                  (JPanel) panel.getComponent(1); // Get the bottom panel
+
                               // Clear the bottom panel and recreate it
                               bottomPanel.removeAll();
-                              
+
                               // Add "Download failed" label to the left side
                               JLabel failedLabel = new JLabel("Download failed.");
-                              
+
                               // Recreate the bottom panel with the same BoxLayout
                               bottomPanel.setLayout(new BoxLayout(bottomPanel, BoxLayout.X_AXIS));
                               bottomPanel.add(failedLabel);
-                              
+
                               // Add flexible space to push the checkbox to the right
                               bottomPanel.add(Box.createHorizontalGlue());
-                              
+
                               // Add Testnet checkbox on the right
                               bottomPanel.add(testnetCheckbox);
-                              
+
                               // Add padding around the panel
                               bottomPanel.setBorder(BorderFactory.createEmptyBorder(5, 10, 5, 10));
-                              
+
                               bottomPanel.revalidate();
                               bottomPanel.repaint();
-                              
+
                               com.intellij.openapi.ui.Messages.showErrorDialog(
                                   project,
                                   "Error downloading file: " + ex.getMessage(),
@@ -409,7 +412,7 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
     // Create bottom panel with BoxLayout for horizontal alignment
     JPanel bottomPanel = new JPanel();
     bottomPanel.setLayout(new BoxLayout(bottomPanel, BoxLayout.X_AXIS));
-    
+
     // Add left component (Open Location link)
     if (jarExists) {
       // If JAR exists, show the "Open Location" link
@@ -427,14 +430,10 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
                 } else {
                   // Fallback for systems where Desktop is not supported
                   com.intellij.openapi.ui.Messages.showInfoMessage(
-                      project,
-                      "Download location: " + dirPath,
-                      "MyLocalTon Plugin");
+                      project, "Download location: " + dirPath, "MyLocalTon Plugin");
                 }
               } catch (Exception ex) {
-                LOG.warn(
-                    "Error opening download location: " + ex.getMessage(),
-                    ex);
+                LOG.warn("Error opening download location: " + ex.getMessage(), ex);
                 com.intellij.openapi.ui.Messages.showErrorDialog(
                     project,
                     "Error opening download location: " + ex.getMessage(),
@@ -446,13 +445,13 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
       // Add some horizontal padding
       bottomPanel.add(Box.createHorizontalStrut(5));
     }
-    
+
     // Add flexible space to push the checkbox to the right
     bottomPanel.add(Box.createHorizontalGlue());
-    
+
     // Add Testnet checkbox on the right
     bottomPanel.add(testnetCheckbox);
-    
+
     // Add padding around the panel
     bottomPanel.setBorder(BorderFactory.createEmptyBorder(5, 10, 5, 10));
 
@@ -485,14 +484,14 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
     checkbox3.setToolTipText("Enables dummy data-generator on start.");
     JCheckBox checkbox4 = new JCheckBox("No GUI mode");
     checkbox4.setToolTipText("Launches MyLocalTon without GUI.");
-    
+
     // Create a panel for the listbox and label to be placed below "No GUI mode"
     JPanel listboxPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
-    
+
     // Create a listbox (JComboBox) with numbers 0 to 5
     Integer[] numbers = {0, 1, 2, 3, 4, 5};
     JComboBox<Integer> listbox = new JComboBox<>(numbers);
-    
+
     // Make the combobox width two times smaller
     Dimension comboBoxSize = listbox.getPreferredSize();
     comboBoxSize.width = comboBoxSize.width - 20;
@@ -504,10 +503,11 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
 
     // Add the listbox to the panel
     listboxPanel.add(listbox);
-    
+
     JCheckBox checkbox5 = new JCheckBox("Debug mode");
-    checkbox5.setToolTipText("Launches MyLocalTon in debug mode that add lots of useful information into log files.");
-    
+    checkbox5.setToolTipText(
+        "Launches MyLocalTon in debug mode that add lots of useful information into log files.");
+
     checkboxPanel.add(checkbox1);
     checkboxPanel.add(checkbox2);
     checkboxPanel.add(checkbox3);
@@ -541,63 +541,66 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
           @Override
           public void actionPerformed(ActionEvent e) {
             LOG.warn("Start button clicked");
-            
 
             try {
               // Get the path to the downloaded JAR file
               Path downloadDir = Paths.get(System.getProperty("user.home"), ".mylocalton");
-              
+
               // Check for any of the possible JAR files
               String jarFilename = getJarFilename(false); // Try mainnet first
               Path jarPath = downloadDir.resolve(jarFilename);
-              
+
               if (!Files.exists(jarPath)) {
                 // Try testnet version
                 jarFilename = getJarFilename(true);
                 jarPath = downloadDir.resolve(jarFilename);
               }
-              
+
               if (!Files.exists(jarPath)) {
                 com.intellij.openapi.ui.Messages.showErrorDialog(
-                    project, 
-                    "MyLocalTon JAR file not found. Please download it first.", 
+                    project,
+                    "MyLocalTon JAR file not found. Please download it first.",
                     "MyLocalTon Plugin");
                 return;
               }
-              
+
               // Build the command with parameters based on checkbox states
               StringBuilder command = new StringBuilder();
-              command.append("java -jar \"").append(jarPath.toString()).append("\"");
-              
+              command.append("java -jar \"").append(jarPath).append("\"");
+
               // Execute the command
               ProcessBuilder processBuilder = new ProcessBuilder();
-              
+
               // Set the working directory to where the JAR is located
               processBuilder.directory(downloadDir.toFile());
-              
+
               // Set the command based on the OS
               if (System.getProperty("os.name").toLowerCase().contains("win")) {
                 processBuilder.command("cmd.exe", "/c", command.toString());
               } else {
                 processBuilder.command("sh", "-c", command.toString());
               }
-              
+
               // Redirect error stream to output stream
               processBuilder.redirectErrorStream(true);
-              
+
               // Launch the process in a detached way without console window
               String osName = System.getProperty("os.name").toLowerCase();
-              
+
               // Create a ProcessBuilder for launching without console
               ProcessBuilder invisibleProcessBuilder = new ProcessBuilder();
-              
+
               // Set the working directory to where the JAR is located
               invisibleProcessBuilder.directory(downloadDir.toFile());
-              
+
               // Redirect standard output and error to /dev/null or NUL
-              invisibleProcessBuilder.redirectOutput(ProcessBuilder.Redirect.to(new File(osName.contains("win") ? "NUL" : "/dev/null")));
-              invisibleProcessBuilder.redirectError(ProcessBuilder.Redirect.to(new File(osName.contains("win") ? "NUL" : "/dev/null")));
-              
+              invisibleProcessBuilder.redirectOutput(
+                  ProcessBuilder.Redirect.to(
+                      new File(osName.contains("win") ? "NUL" : "/dev/null")));
+              invisibleProcessBuilder.redirectError(
+                  ProcessBuilder.Redirect.to(
+                      new File(osName.contains("win") ? "NUL" : "/dev/null")));
+
               if (osName.contains("win")) {
                 // For Windows, use javaw instead of java to avoid console window
                 String javawCommand = command.toString().replace("java ", "javaw ");
@@ -606,107 +609,115 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
                 // For macOS and Linux, use java with appropriate flags
                 invisibleProcessBuilder.command("sh", "-c", command.toString() + " &");
               }
-              
+
               // Start the process and immediately detach from it
               process = invisibleProcessBuilder.start();
               process.getInputStream().close();
               process.getOutputStream().close();
               process.getErrorStream().close();
-              
+
               // For extra safety, start a thread to ensure we don't wait for the process
-              new Thread(() -> {
-                try {
-                  process.waitFor(100, java.util.concurrent.TimeUnit.MILLISECONDS);
-                } catch (Exception ex) {
-                  // Ignore any exceptions
-                }
-              }).start();
-              
+              new Thread(
+                      () -> {
+                        try {
+                          process.waitFor(100, java.util.concurrent.TimeUnit.MILLISECONDS);
+                        } catch (Exception ex) {
+                          // Ignore any exceptions
+                        }
+                      })
+                  .start();
+
               showCopiedMessage("Starting...");
-              
+
             } catch (Exception ex) {
               LOG.warn("Error executing command: " + ex.getMessage(), ex);
               com.intellij.openapi.ui.Messages.showErrorDialog(
-                  project,
-                  "Error executing command: " + ex.getMessage(),
-                  "MyLocalTon Plugin");
+                  project, "Error executing command: " + ex.getMessage(), "MyLocalTon Plugin");
             }
           }
         });
-    
+
     stopButton = new JButton("Stop");
     stopButton.addActionListener(
-            e -> {
-              LOG.warn("Stop button clicked");
-              
-              if (process != null) {
-                try {
-                  // Get the operating system
-                  String osName = System.getProperty("os.name").toLowerCase();
-                  
-                  if (osName.contains("win")) {
-                      // Windows: Use WMIC command to find all process IDs
-                      String jarFilename = getJarFilename(testnetCheckbox.isSelected());
-                      String wmiCommand = "wmic process where \"CommandLine like '%%"+jarFilename+"%%'\" get ProcessId";
-                      LOG.warn("WMI command: " + wmiCommand);
-                      Process wmiProcess = Runtime.getRuntime().exec(wmiCommand);
-                      String output = IOUtils.toString(wmiProcess.getInputStream(), Charset.defaultCharset());
-                      wmiProcess.waitFor();
-                      
-                      // Parse the output to get all process IDs
-                      String[] lines = output.trim().split("\\s+");
-                      java.util.List<Long> pids = new java.util.ArrayList<>();
-                      for (String line : lines) {
-                          if (line.matches("\\d+")) {
-                              pids.add(Long.parseLong(line));
-                          }
-                      }
-                      
-                      LOG.warn("Found " + pids.size() + " processes to terminate");
-                      
-                      // Get the path to the SendSignalCtrlC64.exe utility
-                      String p = Paths.get(System.getProperty("user.home"), ".mylocalton/myLocalTon/utils/SendSignalCtrlC64.exe").toString();
-                      
-                      // Terminate each process
-                      for (Long pid : pids) {
-                          LOG.warn("Sending SIGTERM : " + p + " " + pid);
-                          Runtime.getRuntime().exec(p + " " + pid);
-                      }
-                  } else {
-                      // Non-Windows: Use process.pid() to get the process ID
-                      long pid = process.pid();
-                      LOG.warn("Terminating process with PID: " + pid);
-                      
-                      // For Unix-based systems, use kill -15 (SIGTERM)
-                      Runtime.getRuntime().exec("kill -15 " + pid);
-                  }
-                  
-                  // Wait for the process to terminate
-                  boolean terminated = process.waitFor(5, java.util.concurrent.TimeUnit.SECONDS);
-                  
-                  if (!terminated) {
-                    LOG.warn("Process did not terminate after SIGTERM, forcing destruction");
-                    // If the process didn't terminate, use destroyForcibly()
-                    process.destroyForcibly();
-                  } else {
-                    LOG.warn("Process terminated gracefully after SIGTERM");
-                  }
-                  
-                  process = null;
-                  updateStatusLabel();
-                } catch (Exception ex) {
-                  LOG.warn("Error stopping process: " + ex.getMessage(), ex);
-                  // If an exception occurred, try one more time with destroyForcibly()
-                  if (process != null) {
-                    process.destroyForcibly();
-                    process = null;
-                    updateStatusLabel();
+        e -> {
+          LOG.warn("Stop button clicked");
+
+          if (process != null) {
+            try {
+              // Get the operating system
+              String osName = System.getProperty("os.name").toLowerCase();
+
+              if (osName.contains("win")) {
+                // Windows: Use WMIC command to find all process IDs
+                String jarFilename = getJarFilename(testnetCheckbox.isSelected());
+                String wmiCommand =
+                    "wmic process where \"CommandLine like '%%"
+                        + jarFilename
+                        + "%%'\" get ProcessId";
+                LOG.warn("WMI command: " + wmiCommand);
+                Process wmiProcess = Runtime.getRuntime().exec(wmiCommand);
+                String output =
+                    IOUtils.toString(wmiProcess.getInputStream(), Charset.defaultCharset());
+                wmiProcess.waitFor();
+
+                // Parse the output to get all process IDs
+                String[] lines = output.trim().split("\\s+");
+                java.util.List<Long> pids = new java.util.ArrayList<>();
+                for (String line : lines) {
+                  if (line.matches("\\d+")) {
+                    pids.add(Long.parseLong(line));
                   }
                 }
+
+                LOG.warn("Found " + pids.size() + " processes to terminate");
+
+                // Get the path to the SendSignalCtrlC64.exe utility
+                String p =
+                    Paths.get(
+                            System.getProperty("user.home"),
+                            ".mylocalton/myLocalTon/utils/SendSignalCtrlC64.exe")
+                        .toString();
+
+                // Terminate each process
+                for (Long pid : pids) {
+                  LOG.warn("Sending SIGTERM : " + p + " " + pid);
+                  Runtime.getRuntime().exec(p + " " + pid);
+                }
               } else {
-                LOG.warn("No process to stop");
+                // Non-Windows: Use process.pid() to get the process ID
+                long pid = process.pid();
+                LOG.warn("Terminating process with PID: " + pid);
+
+                // For Unix-based systems, use kill -15 (SIGTERM)
+                Runtime.getRuntime().exec("kill -15 " + pid);
               }
-            });
+
+              // Wait for the process to terminate
+              boolean terminated = process.waitFor(5, java.util.concurrent.TimeUnit.SECONDS);
+
+              if (!terminated) {
+                LOG.warn("Process did not terminate after SIGTERM, forcing destruction");
+                // If the process didn't terminate, use destroyForcibly()
+                process.destroyForcibly();
+              } else {
+                LOG.warn("Process terminated gracefully after SIGTERM");
+              }
+
+              process = null;
+              updateStatusLabel();
+            } catch (Exception ex) {
+              LOG.warn("Error stopping process: " + ex.getMessage(), ex);
+              // If an exception occurred, try one more time with destroyForcibly()
+              if (process != null) {
+                process.destroyForcibly();
+                process = null;
+                updateStatusLabel();
+              }
+            }
+          } else {
+            LOG.warn("No process to stop");
+          }
+        });
     resetButton = createButton("Reset", project, "Reset operation initiated!");
     resetButton.setToolTipText("Reset MyLocalTon to its default state");
 
@@ -734,34 +745,34 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
     buttonsPanel.add(Box.createVerticalGlue());
 
     panel.add(buttonsPanel, BorderLayout.CENTER);
-    
+
     // Create a separate panel for the info label
     JPanel infoPanel = new JPanel();
     infoPanel.setLayout(new BoxLayout(infoPanel, BoxLayout.Y_AXIS));
-    
+
     // Add info label in its own panel
     infoLabel = new JLabel(" "); // Space character to maintain height
     infoLabel.setPreferredSize(new Dimension(180, 15));
     infoLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
     infoLabel.setHorizontalAlignment(SwingConstants.CENTER); // Center text within the label
-    //infoLabel.setForeground(new Color(255, 165, 0)); // Orange color for better visibility
-    //infoLabel.setFont(infoLabel.getFont().deriveFont(Font.BOLD)); // Make text bold
-    
+    // infoLabel.setForeground(new Color(255, 165, 0)); // Orange color for better visibility
+    // infoLabel.setFont(infoLabel.getFont().deriveFont(Font.BOLD)); // Make text bold
+
     // Center the info label horizontally
     JPanel infoLabelPanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
     infoLabelPanel.add(infoLabel);
     infoPanel.add(infoLabelPanel);
-    
+
     // Add the info panel below the buttons panel
     panel.add(infoPanel, BorderLayout.NORTH); // Place at the top for better visibility
 
     // Create bottom panel with GridBagLayout for precise positioning
     JPanel southPanel = new JPanel(new GridBagLayout());
-    
+
     // Create a panel with BoxLayout for vertical arrangement of links
     JPanel linksPanel = new JPanel();
     linksPanel.setLayout(new BoxLayout(linksPanel, BoxLayout.Y_AXIS));
-    
+
     // Create the links
     String tonlibName = new File(getTonlibPath(System.getProperty("user.home"))).getName();
     JLabel tonlibLink = createLink(tonlibName, project, null);
@@ -813,63 +824,56 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
         });
 
     // Add click handler for tonlibLink to copy path to clipboard
-    tonlibLink.addMouseListener(new MouseAdapter() {
-      @Override
-      public void mouseClicked(MouseEvent e) {
-        LOG.warn("tonlibjson link clicked");
-        String userHome = System.getProperty("user.home");
-        String tonlibPath = getTonlibPath(userHome);
+    tonlibLink.addMouseListener(
+        new MouseAdapter() {
+          @Override
+          public void mouseClicked(MouseEvent e) {
+            LOG.warn("tonlibjson link clicked");
+            String userHome = System.getProperty("user.home");
+            String tonlibPath = getTonlibPath(userHome);
 
-        // Copy path to clipboard
-        copyToClipboard(tonlibPath);
-        
-        // Show info message and set timer to hide it
-        showCopiedMessage("Absolute path was copied.");
-      }
-    });
-    
+            // Copy path to clipboard
+            copyToClipboard(tonlibPath);
+
+            // Show info message and set timer to hide it
+            showCopiedMessage("Absolute path was copied");
+          }
+        });
+
     // Add click handler for configLink to copy path to clipboard
-    configLink.addMouseListener(new MouseAdapter() {
-      @Override
-      public void mouseClicked(MouseEvent e) {
-        LOG.warn("global.config.json link clicked");
-        String userHome = System.getProperty("user.home");
-        String osName = System.getProperty("os.name").toLowerCase();
-        String configPath;
-        
-        // Determine the appropriate path based on OS
-        if (osName.contains("win")) {
-          configPath = userHome + "\\.mylocalton\\myLocalTon\\genesis\\db\\my-ton-local.config.json";
-        } else {
-          // For Linux and macOS
-          configPath = userHome + "/.mylocalton/myLocalTon/genesis/db/my-ton-local.config.json";
-        }
-        
-        // Copy path to clipboard
-        copyToClipboard(configPath);
-        
-        // Show info message and set timer to hide it
-        showCopiedMessage("Absolute path was copied.");
-      }
-    });
-    
+    configLink.addMouseListener(
+        new MouseAdapter() {
+          @Override
+          public void mouseClicked(MouseEvent e) {
+            LOG.warn("global.config.json link clicked");
+            String userHome = System.getProperty("user.home");
+            String configPath = getGlobalConfigPath(userHome);
+
+            // Copy path to clipboard
+            copyToClipboard(configPath);
+
+            // Show info message and set timer to hide it
+            showCopiedMessage("Absolute path was copied");
+          }
+        });
+
     // Create panels with left alignment for each link and minimal vertical padding
     JPanel firstLinkPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 5, 0));
     firstLinkPanel.add(tonlibLink);
-    
+
     JPanel secondLinkPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 5, 0));
     secondLinkPanel.add(configLink);
-    
+
     JPanel thirdLinkPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 5, 0));
     thirdLinkPanel.add(myLocalTonLogLink);
-    
+
     // Add all panels to the linksPanel vertically with minimal spacing
     linksPanel.add(firstLinkPanel);
     linksPanel.add(Box.createVerticalStrut(1)); // Minimal vertical spacing
     linksPanel.add(secondLinkPanel);
     linksPanel.add(Box.createVerticalStrut(1)); // Minimal vertical spacing
     linksPanel.add(thirdLinkPanel);
-    
+
     // Create constraints for the links panel (bottom left)
     GridBagConstraints linkConstraints = new GridBagConstraints();
     linkConstraints.gridx = 0;
@@ -878,10 +882,10 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
     linkConstraints.weightx = 1.0;
     linkConstraints.weighty = 1.0;
     southPanel.add(linksPanel, linkConstraints);
-    
+
     // Create status label
     statusLabel = new JLabel("Status: Ready");
-    
+
     // Create constraints for the status label (bottom right)
     GridBagConstraints statusConstraints = new GridBagConstraints();
     statusConstraints.gridx = 1;
@@ -891,13 +895,27 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
     statusConstraints.weighty = 1.0;
     statusConstraints.insets = new Insets(0, 0, 5, 10); // Add some padding at the bottom and right
     southPanel.add(statusLabel, statusConstraints);
-    
+
     // Initial check of lock file status and update button states
     updateStatusLabel();
 
     panel.add(southPanel, BorderLayout.SOUTH);
 
     return panel;
+  }
+
+  private static @NotNull String getGlobalConfigPath(String userHome) {
+    String osName = System.getProperty("os.name").toLowerCase();
+    String configPath;
+
+    // Determine the appropriate path based on OS
+    if (osName.contains("win")) {
+      configPath = userHome + "\\.mylocalton\\myLocalTon\\genesis\\db\\my-ton-local.config.json";
+    } else {
+      // For Linux and macOS
+      configPath = userHome + "/.mylocalton/myLocalTon/genesis/db/my-ton-local.config.json";
+    }
+    return configPath;
   }
 
   private static @NotNull String getTonlibPath(String userHome) {
@@ -933,30 +951,32 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
           @Override
           public void actionPerformed(ActionEvent e) {
             LOG.warn("Delete button clicked");
-            
+
             // Confirm deletion with the user
-            int result = com.intellij.openapi.ui.Messages.showYesNoDialog(
-                project,
-                "Are you sure you want to delete MyLocalTon and all its data?",
-                "Confirm Deletion",
-                com.intellij.openapi.ui.Messages.getQuestionIcon());
-                
+            int result =
+                com.intellij.openapi.ui.Messages.showYesNoDialog(
+                    project,
+                    "Are you sure you want to delete MyLocalTon and all its data?",
+                    "Confirm Deletion",
+                    com.intellij.openapi.ui.Messages.getQuestionIcon());
+
             if (result == com.intellij.openapi.ui.Messages.YES) {
               try {
                 // Get the path to the .mylocalton directory
                 Path mylocaltonDir = Paths.get(System.getProperty("user.home"), ".mylocalton");
-                
+
                 if (Files.exists(mylocaltonDir)) {
                   try {
-                    // Delete all files and subdirectories inside the directory, but keep the directory itself
+                    // Delete all files and subdirectories inside the directory, but keep the
+                    // directory itself
                     FileUtils.cleanDirectory(mylocaltonDir.toFile());
-                    
+
                     // If we get here, deletion was successful
                     com.intellij.openapi.ui.Messages.showInfoMessage(
-                        project, 
+                        project,
                         "MyLocalTon content has been successfully deleted from your computer.",
                         "MyLocalTon Plugin");
-                        
+
                     // Update the download button in the Installation panel
                     JPanel mainPanel = (JPanel) panel.getParent();
                     if (mainPanel != null) {
@@ -972,16 +992,15 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
                   }
                 } else {
                   com.intellij.openapi.ui.Messages.showInfoMessage(
-                      project, 
-                      "MyLocalTon directory not found.",
-                      "MyLocalTon Plugin");
+                      project, "MyLocalTon directory not found.", "MyLocalTon Plugin");
                 }
               } catch (Exception ex) {
                 LOG.warn("Error deleting MyLocalTon content: " + ex.getMessage(), ex);
                 com.intellij.openapi.ui.Messages.showErrorDialog(
                     project,
-                    "Error deleting MyLocalTon content: " + ex.getMessage() + 
-                    "\nPlease check if the MyLocalTon process is not running.",
+                    "Error deleting MyLocalTon content: "
+                        + ex.getMessage()
+                        + "\nPlease check if the MyLocalTon process is not running.",
                     "Deletion Failed");
               }
             }
@@ -996,13 +1015,15 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
     // Add label below Delete button, aligned to the right
     JPanel southPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
     // Create a multiline label with HTML to enable text wrapping
-    JLabel uninstallStatusLabel = new JLabel("<html><div style='width:250px; align:left;'>Completely removes MyLocalTon from your computer. You will have to download it again.</div></html>");
+    JLabel uninstallStatusLabel =
+        new JLabel(
+            "<html><div style='width:250px; align:left;'>Completely removes MyLocalTon from your computer. You will have to download it again.</div></html>");
     southPanel.add(uninstallStatusLabel);
     panel.add(southPanel, BorderLayout.SOUTH);
 
     return panel;
   }
-  
+
   /**
    * Updates the download button in the Installation panel after deletion.
    *
@@ -1010,9 +1031,9 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
    */
   private void updateDownloadButtonAfterDeletion(JPanel mainPanel) {
 
-      downloadButton.setText("DOWNLOAD");
-      downloadButton.setEnabled(true);
-      testnetCheckbox.setEnabled(true);
+    downloadButton.setText("DOWNLOAD");
+    downloadButton.setEnabled(true);
+    testnetCheckbox.setEnabled(true);
   }
 
   /**
@@ -1023,18 +1044,18 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
    */
   private void setEnabledRecursively(Container container, boolean enabled) {
     container.setEnabled(enabled);
-    
+
     // Process all components in the container
     for (Component component : container.getComponents()) {
       component.setEnabled(enabled);
-      
+
       // If the component is a container, process its children recursively
       if (component instanceof Container) {
         setEnabledRecursively((Container) component, enabled);
       }
     }
   }
-  
+
   private JButton createButton(String text, Project project, String message) {
     JButton button = new JButton(text);
     button.addActionListener(
@@ -1086,27 +1107,31 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
     Toolkit.getDefaultToolkit().getSystemClipboard().setContents(selection, null);
     LOG.warn("Copied to clipboard: " + text);
   }
-  
+
   /**
-   * Shows the "absolute path was copied" message in the info label and sets a timer to hide it after 3 seconds.
+   * Shows the "absolute path was copied" message in the info label and sets a timer to hide it
+   * after 3 seconds.
    */
   private void showCopiedMessage(String text) {
     // Update the info label
     infoLabel.setText(text);
-    
+
     // Create a timer to reset the message after 3 seconds
-    Timer hideTimer = new Timer(3000, new ActionListener() {
-      @Override
-      public void actionPerformed(ActionEvent e) {
-        infoLabel.setText(" "); // Reset to space character to maintain layout
-        // Ensure horizontal alignment is maintained
-        infoLabel.setHorizontalAlignment(SwingConstants.CENTER);
-      }
-    });
+    Timer hideTimer =
+        new Timer(
+            3000,
+            new ActionListener() {
+              @Override
+              public void actionPerformed(ActionEvent e) {
+                infoLabel.setText(" "); // Reset to space character to maintain layout
+                // Ensure horizontal alignment is maintained
+                infoLabel.setHorizontalAlignment(SwingConstants.CENTER);
+              }
+            });
     hideTimer.setRepeats(false); // Only execute once
     hideTimer.start();
   }
-  
+
   private void downloadFile(String fileUrl, File targetFile, JProgressBar progressBar)
       throws IOException {
     URL url = new URL(fileUrl);
