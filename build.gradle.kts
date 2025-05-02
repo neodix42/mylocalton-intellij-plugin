@@ -22,4 +22,5 @@ dependencies {
     create(IntelliJPlatformType.IntellijIdeaUltimate, "2024.3.5") // community
   }
   implementation("commons-io:commons-io:2.19.0")
+  implementation("io.github.neodix42:liteclient:0.9.7")
 }

@@ -2,8 +2,10 @@ package org.ton.mylocalton.plugin;
 
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.ui.Messages;
 import com.intellij.openapi.wm.ToolWindow;
 import com.intellij.openapi.wm.ToolWindowFactory;
+import com.intellij.ui.content.Content;
 import com.intellij.ui.content.ContentFactory;
 import java.awt.*;
 import java.awt.datatransfer.StringSelection;
@@ -21,11 +23,22 @@ import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import javax.swing.*;
 import javax.swing.border.TitledBorder;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang3.SystemUtils;
 import org.jetbrains.annotations.NotNull;
+import org.ton.java.liteclient.LiteClient;
+import org.ton.java.liteclient.LiteClientParser;
+import org.ton.java.liteclient.api.ResultLastBlock;
+
+import static java.util.Objects.isNull;
+import static java.util.Objects.nonNull;
 
 /** Factory for creating the Demo Tool Window. */
 public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
@@ -42,7 +55,7 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
   private JCheckBox testnetCheckbox; // Reference to the testnet checkbox
   private JButton downloadButton;
   private Process process;
-  
+  ScheduledExecutorService monitorExecutorService;
   // References to startup settings checkboxes and combobox
   private JCheckBox tonHttpApiV2;
   private JCheckBox webExplorer;
@@ -50,7 +63,7 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
   private JCheckBox noGuiMode;
   private JCheckBox debugMode;
   private JComboBox<Integer> validators;
-
+  LiteClient liteClient;
   static {
     LOG.warn("DemoToolWindowFactory class loaded");
   }
@@ -134,22 +147,50 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
 
       // Add the panel to the tool window
       ContentFactory contentFactory = ContentFactory.getInstance();
-      com.intellij.ui.content.Content content =
+      Content content =
           contentFactory.createContent(mainPanel, "MyLocalTon", false);
       toolWindow.getContentManager().addContent(content);
 
-      // Start the timer to check the lock file status every 5 seconds
-      lockFileMonitor =
-          new Timer(
-              5000,
-              new ActionListener() {
-                @Override
-                public void actionPerformed(ActionEvent e) {
-                  updateStatusLabel();
-                }
-              });
-      lockFileMonitor.setInitialDelay(0);
-      lockFileMonitor.start();
+      monitorExecutorService = Executors.newSingleThreadScheduledExecutor();
+      monitorExecutorService.scheduleWithFixedDelay(
+          () -> {
+            Thread.currentThread().setName("MyLocalTon-Plugin - Blockchain Monitor");
+
+            try {
+              String userHomeDir = System.getProperty("user.home");
+              if (isNull(liteClient)) {
+                LOG.warn("init liteclient");
+                liteClient =
+                    LiteClient.builder()
+                        .pathToGlobalConfig(getGlobalConfigPath(userHomeDir))
+                        .pathToLiteClientBinary(getLiteClientPath(userHomeDir))
+                        .build();
+              } else {
+                LOG.warn("inited liteclient");
+              }
+
+              //            String size =  getDirectorySizeUsingDu(getMyLocalTonPath(userHomeDir));
+              String last = liteClient.executeLast();
+              if (last.contains("latest masterchain block known to server")) {
+                ResultLastBlock resultLastBlock = LiteClientParser.parseLast(last);
+                startButton.setEnabled(false);
+                stopButton.setEnabled(true);
+                //                          java.util.List<ResultLastBlock> shards =
+                // LiteClientParser.parseAllShards(liteClient.executeAllshards(resultLastBlock));
+                //                        LOG.warn("size last shards "+ size+" "+
+                // resultLastBlock.getSeqno()+" "+shards.size());
+                statusLabel.setText("Block: " + resultLastBlock.getSeqno());
+              }
+              else {
+                updateStatusLabel();
+              }
+            } catch (Exception ex) {
+              updateStatusLabel();
+            }
+          },
+          2L,
+          2L,
+          TimeUnit.SECONDS);
 
       LOG.warn("Tool window content created successfully");
     } catch (Exception e) {
@@ -321,7 +362,7 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
                                           Desktop.getDesktop().open(new File(dirPath));
                                         } else {
                                           // Fallback for systems where Desktop is not supported
-                                          com.intellij.openapi.ui.Messages.showInfoMessage(
+                                          Messages.showInfoMessage(
                                               project,
                                               "Download location: " + dirPath,
                                               "MyLocalTon Plugin");
@@ -330,7 +371,7 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
                                         LOG.warn(
                                             "Error opening download location: " + ex.getMessage(),
                                             ex);
-                                        com.intellij.openapi.ui.Messages.showErrorDialog(
+                                        Messages.showErrorDialog(
                                             project,
                                             "Error opening download location: " + ex.getMessage(),
                                             "MyLocalTon Plugin");
@@ -354,7 +395,7 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
                               bottomPanel.revalidate();
                               bottomPanel.repaint();
 
-                              com.intellij.openapi.ui.Messages.showInfoMessage(
+                              Messages.showInfoMessage(
                                   project,
                                   "Download completed successfully!\nFile saved to: " + targetPath,
                                   "MyLocalTon Plugin");
@@ -391,7 +432,7 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
                               bottomPanel.revalidate();
                               bottomPanel.repaint();
 
-                              com.intellij.openapi.ui.Messages.showErrorDialog(
+                              Messages.showErrorDialog(
                                   project,
                                   "Error downloading file: " + ex.getMessage(),
                                   "MyLocalTon Plugin");
@@ -434,12 +475,12 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
                   Desktop.getDesktop().open(new File(dirPath));
                 } else {
                   // Fallback for systems where Desktop is not supported
-                  com.intellij.openapi.ui.Messages.showInfoMessage(
+                  Messages.showInfoMessage(
                       project, "Download location: " + dirPath, "MyLocalTon Plugin");
                 }
               } catch (Exception ex) {
                 LOG.warn("Error opening download location: " + ex.getMessage(), ex);
-                com.intellij.openapi.ui.Messages.showErrorDialog(
+                Messages.showErrorDialog(
                     project,
                     "Error opening download location: " + ex.getMessage(),
                     "MyLocalTon Plugin");
@@ -549,8 +590,9 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
             LOG.warn("Start button clicked");
 
             try {
+              String userHomeDir = System.getProperty("user.home");
               // Get the path to the downloaded JAR file
-              Path downloadDir = Paths.get(System.getProperty("user.home"), ".mylocalton");
+              Path downloadDir = Paths.get(userHomeDir, ".mylocalton");
 
               // Check for any of the possible JAR files
               String jarFilename = getJarFilename(false); // Try mainnet first
@@ -563,7 +605,7 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
               }
 
               if (!Files.exists(jarPath)) {
-                com.intellij.openapi.ui.Messages.showErrorDialog(
+                Messages.showErrorDialog(
                     project,
                     "MyLocalTon JAR file not found. Please download it first.",
                     "MyLocalTon Plugin");
@@ -635,7 +677,7 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
               new Thread(
                       () -> {
                         try {
-                          process.waitFor(100, java.util.concurrent.TimeUnit.MILLISECONDS);
+                          process.waitFor(100, TimeUnit.MILLISECONDS);
                         } catch (Exception ex) {
                           // Ignore any exceptions
                         }
@@ -646,7 +688,7 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
 
             } catch (Exception ex) {
               LOG.warn("Error executing command: " + ex.getMessage(), ex);
-              com.intellij.openapi.ui.Messages.showErrorDialog(
+              Messages.showErrorDialog(
                   project, "Error executing command: " + ex.getMessage(), "MyLocalTon Plugin");
             }
           }
@@ -657,7 +699,7 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
         e -> {
           LOG.warn("Stop button clicked");
 
-          if (process != null) {
+
             try {
               // Get the operating system
               String osName = System.getProperty("os.name").toLowerCase();
@@ -677,7 +719,7 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
 
                 // Parse the output to get all process IDs
                 String[] lines = output.trim().split("\\s+");
-                java.util.List<Long> pids = new java.util.ArrayList<>();
+                java.util.List<Long> pids = new ArrayList<>();
                 for (String line : lines) {
                   if (line.matches("\\d+")) {
                     pids.add(Long.parseLong(line));
@@ -700,7 +742,7 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
                 }
               } else {
                 // Non-Windows: Use process.pid() to get the process ID
-                long pid = process.pid();
+                long pid = process.pid(); // find pid on linux and mac todo
                 LOG.warn("Terminating process with PID: " + pid);
 
                 // For Unix-based systems, use kill -15 (SIGTERM)
@@ -708,30 +750,28 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
               }
 
               // Wait for the process to terminate
-              boolean terminated = process.waitFor(5, java.util.concurrent.TimeUnit.SECONDS);
+//              boolean terminated = process.waitFor(5, TimeUnit.SECONDS);
 
-              if (!terminated) {
-                LOG.warn("Process did not terminate after SIGTERM, forcing destruction");
-                // If the process didn't terminate, use destroyForcibly()
-                process.destroyForcibly();
-              } else {
-                LOG.warn("Process terminated gracefully after SIGTERM");
-              }
+//              if (!terminated) {
+//                LOG.warn("Process did not terminate after SIGTERM, forcing destruction");
+//                // If the process didn't terminate, use destroyForcibly()
+//                process.destroyForcibly();
+//              } else {
+//                LOG.warn("Process terminated gracefully after SIGTERM");
+//              }
 
-              process = null;
-              updateStatusLabel();
+//              process = null;
+//              updateStatusLabel();
+              showCopiedMessage("Stopping...");
             } catch (Exception ex) {
               LOG.warn("Error stopping process: " + ex.getMessage(), ex);
               // If an exception occurred, try one more time with destroyForcibly()
               if (process != null) {
                 process.destroyForcibly();
-                process = null;
                 updateStatusLabel();
               }
             }
-          } else {
-            LOG.warn("No process to stop");
-          }
+
         });
 
     // Center-align buttons
@@ -810,7 +850,7 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
 
               // Check if the file exists
               if (!logFile.exists()) {
-                com.intellij.openapi.ui.Messages.showErrorDialog(
+                Messages.showErrorDialog(
                     project, "Log file not found at: " + logFilePath, "MyLocalTon Plugin");
                 return;
               }
@@ -820,12 +860,12 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
                 Desktop.getDesktop().open(logFile);
               } else {
                 // Fallback for systems where Desktop is not supported
-                com.intellij.openapi.ui.Messages.showInfoMessage(
+                Messages.showInfoMessage(
                     project, "Log file location: " + logFilePath, "MyLocalTon Plugin");
               }
             } catch (Exception ex) {
               LOG.warn("Error opening log file: " + ex.getMessage(), ex);
-              com.intellij.openapi.ui.Messages.showErrorDialog(
+              Messages.showErrorDialog(
                   project, "Error opening log file: " + ex.getMessage(), "MyLocalTon Plugin");
             }
           }
@@ -912,7 +952,7 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
     return panel;
   }
 
-  private static @NotNull String getGlobalConfigPath(String userHome) {
+  private @NotNull String getGlobalConfigPath(String userHome) {
     String osName = System.getProperty("os.name").toLowerCase();
     String configPath;
 
@@ -926,7 +966,7 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
     return configPath;
   }
 
-  private static @NotNull String getTonlibPath(String userHome) {
+  private @NotNull String getTonlibPath(String userHome) {
     String osName = System.getProperty("os.name").toLowerCase();
     String tonlibPath;
 
@@ -940,6 +980,47 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
       tonlibPath = userHome + "/.mylocalton/myLocalTon/genesis/bin/tonlibjson.so";
     }
     return tonlibPath;
+  }
+
+  private @NotNull String getLiteClientPath(String userHome) {
+    String osName = System.getProperty("os.name").toLowerCase();
+    String tonlibPath;
+
+    // Determine the appropriate path based on OS
+    if (osName.contains("win")) {
+      tonlibPath = userHome + "\\.mylocalton\\myLocalTon\\genesis\\bin\\lite-client.exe";
+    } else if (osName.contains("mac")) {
+      tonlibPath = userHome + "/.mylocalton/myLocalTon/genesis/bin/lite-client";
+    } else {
+      // Assume Linux or other Unix-like OS
+      tonlibPath = userHome + "/.mylocalton/myLocalTon/genesis/bin/lite-client";
+    }
+    return tonlibPath;
+  }
+
+  private @NotNull String getDuPath(String userHome) {
+    String osName = System.getProperty("os.name").toLowerCase();
+    String tonlibPath = "";
+
+    // Determine the appropriate path based on OS
+    if (osName.contains("win")) {
+      tonlibPath = userHome + "\\.mylocalton\\myLocalTon\\utils\\du.exe";
+    }
+    return tonlibPath;
+  }
+
+  private static @NotNull String getMyLocalTonPath(String userHome) {
+    String osName = System.getProperty("os.name").toLowerCase();
+    String configPath;
+
+    // Determine the appropriate path based on OS
+    if (osName.contains("win")) {
+      configPath = userHome + "\\.mylocalton\\myLocalTon";
+    } else {
+      // For Linux and macOS
+      configPath = userHome + "/.mylocalton/myLocalTon";
+    }
+    return configPath;
   }
 
   private JPanel createUninstallPanel(Project project) {
@@ -971,13 +1052,13 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
 
             // Confirm deletion with the user
             int result =
-                com.intellij.openapi.ui.Messages.showYesNoDialog(
+                Messages.showYesNoDialog(
                     project,
                     "Are you sure you want to delete MyLocalTon and all its data?",
                     "Confirm Deletion",
-                    com.intellij.openapi.ui.Messages.getQuestionIcon());
+                    Messages.getQuestionIcon());
 
-            if (result == com.intellij.openapi.ui.Messages.YES) {
+            if (result == Messages.YES) {
               try {
                 // Get the path to the .mylocalton directory
                 Path mylocaltonDir = Paths.get(System.getProperty("user.home"), ".mylocalton");
@@ -989,7 +1070,7 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
                     FileUtils.cleanDirectory(mylocaltonDir.toFile());
 
                     // If we get here, deletion was successful
-                    com.intellij.openapi.ui.Messages.showInfoMessage(
+                    Messages.showInfoMessage(
                         project,
                         "MyLocalTon content has been successfully deleted from your computer.",
                         "MyLocalTon Plugin");
@@ -1002,18 +1083,18 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
                   } catch (IOException ex) {
                     // If an IOException occurs, it means deletion failed
                     LOG.warn("Failed to delete MyLocalTon content: " + ex.getMessage(), ex);
-                    com.intellij.openapi.ui.Messages.showErrorDialog(
+                    Messages.showErrorDialog(
                         project,
                         "Failed to delete MyLocalTon content. Please check if the MyLocalTon process is not running.",
                         "Deletion Failed");
                   }
                 } else {
-                  com.intellij.openapi.ui.Messages.showInfoMessage(
+                  Messages.showInfoMessage(
                       project, "MyLocalTon directory not found.", "MyLocalTon Plugin");
                 }
               } catch (Exception ex) {
                 LOG.warn("Error deleting MyLocalTon content: " + ex.getMessage(), ex);
-                com.intellij.openapi.ui.Messages.showErrorDialog(
+                Messages.showErrorDialog(
                     project,
                     "Error deleting MyLocalTon content: "
                         + ex.getMessage()
@@ -1097,7 +1178,7 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
             @Override
             public void mouseClicked(MouseEvent e) {
               LOG.warn(text + " link clicked");
-              com.intellij.openapi.ui.Messages.showInfoMessage(
+              Messages.showInfoMessage(
                   project, message, "MyLocalTon Plugin");
             }
           });
@@ -1184,6 +1265,44 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
 
       // Ensure progress bar shows 100% when done
       SwingUtilities.invokeLater(() -> progressBar.setValue(100));
+    }
+  }
+
+  public String getDirectorySizeUsingDu(String path) {
+    String resultInput = "0MB";
+    if (SystemUtils.IS_OS_WINDOWS) {
+      try {
+
+        String cmd = getDuPath(System.getProperty("user.home"))+" -hs "+path;
+        LOG.debug(cmd);
+        Process p = Runtime.getRuntime().exec(cmd);
+        InputStream procOutput = p.getInputStream();
+
+        resultInput = IOUtils.toString(procOutput, Charset.defaultCharset());
+        LOG.debug(resultInput);
+        String[] s = resultInput.split("\t");
+
+        return s[0];
+      } catch (Exception e) {
+        LOG.error("cannot get folder size on windows {}", path);
+        return resultInput;
+      }
+    } else {
+      try {
+        String cmd = "du -hs " + path;
+        LOG.debug(cmd);
+        Process p = Runtime.getRuntime().exec(cmd);
+        InputStream procOutput = p.getInputStream();
+
+        resultInput = IOUtils.toString(procOutput, Charset.defaultCharset());
+        LOG.debug(resultInput);
+        String[] s = resultInput.split("\t");
+
+        return s[0];
+      } catch (Exception e) {
+        LOG.error("cannot get folder size on linux {}", path);
+        return resultInput;
+      }
     }
   }
 }
