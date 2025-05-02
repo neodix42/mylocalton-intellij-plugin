@@ -23,4 +23,5 @@ dependencies {
   }
   implementation("commons-io:commons-io:2.19.0")
   implementation("io.github.neodix42:liteclient:0.9.7")
+  implementation("com.googlecode.json-simple:json-simple:1.1.1")
 }

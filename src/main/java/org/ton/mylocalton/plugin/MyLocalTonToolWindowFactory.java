@@ -15,6 +15,7 @@ import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
@@ -506,6 +507,58 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
     return panel;
   }
 
+  /**
+   * Loads settings from the settings.json file if it exists and sets the checkboxes accordingly.
+   */
+  private void loadSettingsFromFile() {
+    String userHome = System.getProperty("user.home");
+    String osName = System.getProperty("os.name").toLowerCase();
+    String settingsFilePath;
+
+    // Determine the appropriate path based on OS
+    if (osName.contains("win")) {
+      settingsFilePath = userHome + "\\.mylocalton\\myLocalTon\\settings.json";
+    } else {
+      // For Linux and macOS
+      settingsFilePath = userHome + "/.mylocalton/myLocalTon/settings.json";
+    }
+
+    File settingsFile = new File(settingsFilePath);
+    if (settingsFile.exists()) {
+      LOG.warn("Settings file found at: " + settingsFilePath);
+      
+      // Use a more robust approach to read the settings file
+      try {
+        // Read the file content as a string
+        String jsonContent = new String(Files.readAllBytes(settingsFile.toPath()));
+        
+        // Check if the file contains the keys we're looking for
+        boolean enableTonHttpApi = jsonContent.contains("\"enableTonHttpApi\": true");
+        boolean enableBlockchainExplorer = jsonContent.contains("\"enableBlockchainExplorer\": true");
+        boolean enableDataGenerator = jsonContent.contains("\"enableDataGenerator\": true");
+        
+        // Set checkboxes based on settings
+        if (tonHttpApiV2 != null) {
+          tonHttpApiV2.setSelected(enableTonHttpApi);
+        }
+        
+        if (webExplorer != null) {
+          webExplorer.setSelected(enableBlockchainExplorer);
+        }
+        
+        if (dataGenerator != null) {
+          dataGenerator.setSelected(enableDataGenerator);
+        }
+        
+        LOG.warn("Settings loaded successfully from file");
+      } catch (IOException e) {
+        LOG.warn("Error loading settings from file: " + e.getMessage(), e);
+      }
+    } else {
+      LOG.warn("Settings file not found at: " + settingsFilePath);
+    }
+  }
+
   private JPanel createStartupSettingsPanel(Project project) {
     JPanel panel = new JPanel(new BorderLayout());
     panel.setBorder(
@@ -564,6 +617,9 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
 
     contentPanel.add(checkboxPanel);
     panel.add(contentPanel, BorderLayout.CENTER);
+    
+    // Load settings from file if it exists
+    loadSettingsFromFile();
 
     return panel;
   }
@@ -1160,6 +1216,7 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
 
                 try {
                     FileUtils.cleanDirectory(mylocaltonDir.toFile());
+
                 } catch (IOException ex) {
                     throw new RuntimeException(ex);
                 }
