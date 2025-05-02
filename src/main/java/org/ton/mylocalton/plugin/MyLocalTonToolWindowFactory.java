@@ -52,6 +52,7 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
   private JButton stopButton;
   private JButton resetButton;
   private JButton deleteButton;
+  private JLabel messageLabel;
   private JPanel startupSettingsPanel;
   private JCheckBox testnetCheckbox; // Reference to the testnet checkbox
   private JButton downloadButton;
@@ -65,9 +66,10 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
   private JCheckBox debugMode;
   private JComboBox<Integer> validators;
   LiteClient liteClient;
-  static {
-    LOG.warn("DemoToolWindowFactory class loaded");
-  }
+
+//  static {
+//    LOG.warn("DemoToolWindowFactory class loaded");
+//  }
 
   /**
    * Checks if the myLocalTon.lock file exists in the user.dir directory.
@@ -159,19 +161,25 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
 
             try {
               String userHomeDir = System.getProperty("user.home");
-              if (isNull(liteClient)) {
-                LOG.warn("init liteclient");
-                liteClient =
-                    LiteClient.builder()
-                        .pathToGlobalConfig(getGlobalConfigPath(userHomeDir))
-                        .pathToLiteClientBinary(getLiteClientPath(userHomeDir))
-                        .build();
-              } else {
-                LOG.warn("inited liteclient");
-              }
+              String last = "";
+              if (isLockFileExists()) {
+                if (isNull(liteClient)) {
+                  if (Files.exists(Paths.get(getLiteClientPath(userHomeDir)))) {
+                    LOG.warn("init liteclient");
+                    liteClient =
+                        LiteClient.builder()
+                            .pathToGlobalConfig(getGlobalConfigPath(userHomeDir))
+                            .pathToLiteClientBinary(getLiteClientPath(userHomeDir))
+                            .build();
+                  }
+                } else {
+                  LOG.warn("inited liteclient");
+                }
 
-              //            String size =  getDirectorySizeUsingDu(getMyLocalTonPath(userHomeDir));
-              String last = liteClient.executeLast();
+                //            String size =  getDirectorySizeUsingDu(getMyLocalTonPath(userHomeDir));
+
+                 last= liteClient.executeLast();
+              }
               if (last.contains("latest masterchain block known to server")) {
                 ResultLastBlock resultLastBlock = LiteClientParser.parseLast(last);
                 startButton.setEnabled(false);
@@ -181,8 +189,7 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
                 //                        LOG.warn("size last shards "+ size+" "+
                 // resultLastBlock.getSeqno()+" "+shards.size());
                 statusLabel.setText("Block: " + resultLastBlock.getSeqno());
-              }
-              else {
+              } else {
                 updateStatusLabel();
               }
             } catch (Exception ex) {
@@ -805,20 +812,8 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
                 Runtime.getRuntime().exec("kill -15 " + pid);
               }
 
-              // Wait for the process to terminate
-//              boolean terminated = process.waitFor(5, TimeUnit.SECONDS);
-
-//              if (!terminated) {
-//                LOG.warn("Process did not terminate after SIGTERM, forcing destruction");
-//                // If the process didn't terminate, use destroyForcibly()
-//                process.destroyForcibly();
-//              } else {
-//                LOG.warn("Process terminated gracefully after SIGTERM");
-//              }
-
-//              process = null;
-//              updateStatusLabel();
               showCopiedMessage("Stopping...");
+
             } catch (Exception ex) {
               LOG.warn("Error stopping process: " + ex.getMessage(), ex);
               // If an exception occurred, try one more time with destroyForcibly()
@@ -1125,11 +1120,12 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
                     // directory itself
                     FileUtils.cleanDirectory(mylocaltonDir.toFile());
 
-                    // If we get here, deletion was successful
-                    Messages.showInfoMessage(
-                        project,
-                        "MyLocalTon content has been successfully deleted from your computer.",
-                        "MyLocalTon Plugin");
+                    messageLabel.setText("MyLocalTon has been successfully uninstalled.");
+                    Timer hideTimer = new Timer(5000, event -> {
+                      messageLabel.setText(" ");
+                    });
+                    hideTimer.setRepeats(false);
+                    hideTimer.start();
 
                     // Update the download button in the Installation panel
                     JPanel mainPanel = (JPanel) panel.getParent();
@@ -1171,6 +1167,14 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
     buttonPanel.add(deleteButton);
     
     panel.add(buttonPanel, BorderLayout.CENTER);
+    
+    // Create a message label and add it below the buttons
+    messageLabel = new JLabel(" ");
+    messageLabel.setHorizontalAlignment(SwingConstants.CENTER);
+    messageLabel.setPreferredSize(new Dimension(300, 20));
+    
+    // Add the message label to the bottom of the panel
+    panel.add(messageLabel, BorderLayout.SOUTH);
 
     return panel;
   }
@@ -1210,17 +1214,38 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
   private JButton createResetButton(String text, Project project) {
     JButton button = new JButton(text);
     button.addActionListener(
-            e -> {
-              LOG.warn("reset button clicked");
-              Path mylocaltonDir = Paths.get(System.getProperty("user.home"), ".mylocalton/myLocalTon");
+        e -> {
+          LOG.warn("reset button clicked");
+          Path mylocaltonDir = Paths.get(System.getProperty("user.home"), ".mylocalton/myLocalTon");
 
-                try {
-                    FileUtils.cleanDirectory(mylocaltonDir.toFile());
+          try {
+            if (Files.exists(mylocaltonDir)) {
+              FileUtils.cleanDirectory(mylocaltonDir.toFile());
 
-                } catch (IOException ex) {
-                    throw new RuntimeException(ex);
-                }
-            });
+              messageLabel.setText("Reset successful. Blockchain state has been cleared.");
+              Timer hideTimer =
+                  new Timer(
+                      5000,
+                      event -> {
+                        messageLabel.setText(" ");
+                      });
+              hideTimer.setRepeats(false);
+              hideTimer.start();
+            } else {
+              messageLabel.setText("No blockchain state found.");
+              Timer hideTimer =
+                      new Timer(
+                              5000,
+                              event -> {
+                                messageLabel.setText(" ");
+                              });
+              hideTimer.setRepeats(false);
+              hideTimer.start();
+            }
+          } catch (IOException ex) {
+            messageLabel.setText("Reset failed.");
+          }
+        });
     return button;
   }
 
