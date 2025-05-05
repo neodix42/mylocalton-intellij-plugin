@@ -171,8 +171,6 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
                             .pathToLiteClientBinary(getLiteClientPath(userHomeDir))
                             .build();
                   }
-                } else {
-                  LOG.warn("inited liteclient");
                 }
 
                 //            String size =  getDirectorySizeUsingDu(getMyLocalTonPath(userHomeDir));
