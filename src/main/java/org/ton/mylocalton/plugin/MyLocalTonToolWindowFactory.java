@@ -46,6 +46,7 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
   private static final Logger LOG = Logger.getInstance(MyLocalTonToolWindowFactory.class);
   private JLabel statusLabel;
   private JLabel infoLabel; // Label to show "absolute path was copied" message
+  private JLabel versionLabel; // Label to show version information
   private Timer lockFileMonitor;
   private JButton startButton;
   private JButton stopButton;
@@ -248,6 +249,15 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
             "Installation",
             TitledBorder.LEFT,
             TitledBorder.TOP));
+    
+    // Create version label with a distinct appearance to ensure visibility
+    versionLabel = new JLabel("Version: ");
+    versionLabel.setOpaque(true); // Make it opaque
+
+    // Add the version label directly to the panel's NORTH-EAST area
+    JPanel versionPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+    versionPanel.add(versionLabel);
+    panel.add(versionPanel, BorderLayout.NORTH);
 
     downloadButton = new JButton();
     // Create testnet checkbox
@@ -275,10 +285,48 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
     if (testnetJarExists) {
       testnetCheckbox.setSelected(true);
     }
+    
+    // If any JAR file exists, execute it with "version" parameter to get the version
+    if (jarExists) {
+      new Thread(() -> {
+        try {
+          // Determine which JAR file to use
+          Path jarPath;
+          if (testnetJarExists) {
+            jarPath = testnetCheckbox.isSelected() ? 
+                      (Files.exists(testnetArmJarPath) ? testnetArmJarPath : testnetX86JarPath) :
+                      (Files.exists(mainnetArmJarPath) ? mainnetArmJarPath : mainnetX86JarPath);
+          } else {
+            jarPath = Files.exists(mainnetArmJarPath) ? mainnetArmJarPath : mainnetX86JarPath;
+          }
+          
+          // Build the command to execute the JAR with "version" parameter
+          String versionCommand = "java -jar \"" + jarPath + "\" version";
+          LOG.warn("Executing version command on startup: " + versionCommand);
+          
+          // Execute the command and capture the output
+          Process versionProcess = Runtime.getRuntime().exec(versionCommand);
+          String versionOutput = IOUtils.toString(versionProcess.getInputStream(), Charset.defaultCharset());
+          versionProcess.waitFor();
+          
+          // Trim the output and update the version label
+          final String version = versionOutput.trim();
+          LOG.warn("Version detected on startup: " + version);
+          
+          // Update the version label in the UI thread
+          SwingUtilities.invokeLater(() -> {
+            versionLabel.setText(version);
+            versionLabel.repaint(); // Force repaint
+          });
+        } catch (Exception ex) {
+          LOG.warn("Error getting version on startup: " + ex.getMessage(), ex);
+        }
+      }).start();
+    }
 
-    // Create top panel with centered Download button and progress bar
-    JPanel topPanel = new JPanel();
-    topPanel.setLayout(new BoxLayout(topPanel, BoxLayout.Y_AXIS));
+    // Create download panel with centered Download button and progress bar
+    JPanel downloadPanel = new JPanel();
+    downloadPanel.setLayout(new BoxLayout(downloadPanel, BoxLayout.Y_AXIS));
 
     // Download button panel (centered)
     JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
@@ -337,6 +385,29 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
 
                         // Download the file and update progress
                         downloadFile(fileUrl, targetFile, progressBar);
+                        
+                        // Execute the JAR with "version" parameter to get the version
+                        try {
+                          // Build the command to execute the JAR with "version" parameter
+                          String versionCommand = "java -jar \"" + targetPath + "\" version";
+                          LOG.warn("Executing version command: " + versionCommand);
+                          
+                          // Execute the command and capture the output
+                          Process versionProcess = Runtime.getRuntime().exec(versionCommand);
+                          String versionOutput = IOUtils.toString(versionProcess.getInputStream(), Charset.defaultCharset());
+                          versionProcess.waitFor();
+                          
+                          // Trim the output and update the version label
+                          final String version = versionOutput.trim();
+                          LOG.warn("Version detected: " + version);
+                          
+                          // Update the version label in the UI thread
+                          SwingUtilities.invokeLater(() -> {
+                            versionLabel.setText(version);
+                          });
+                        } catch (Exception versionEx) {
+                          LOG.warn("Error getting version: " + versionEx.getMessage(), versionEx);
+                        }
 
                         // Show success message
                         SwingUtilities.invokeLater(
@@ -352,8 +423,11 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
 
                               // Clear the bottom panel and recreate it
                               bottomPanel.removeAll();
-
-                              // Add "Open Location" link to the left side
+                              
+                              // Recreate the bottom panel with the same BoxLayout
+                              bottomPanel.setLayout(new BoxLayout(bottomPanel, BoxLayout.X_AXIS));
+                              
+                              // Add "Open Location" link to the left side if it doesn't already exist
                               JLabel openLocationLink = createLink("Open Location", project, null);
                               openLocationLink.addMouseListener(
                                   new MouseAdapter() {
@@ -383,9 +457,6 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
                                       }
                                     }
                                   });
-
-                              // Recreate the bottom panel with the same BoxLayout
-                              bottomPanel.setLayout(new BoxLayout(bottomPanel, BoxLayout.X_AXIS));
                               bottomPanel.add(openLocationLink);
 
                               // Add flexible space to push the checkbox to the right
@@ -453,12 +524,12 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
         });
     buttonPanel.add(downloadButton);
 
-    // Add components to top panel
-    topPanel.add(buttonPanel);
-    topPanel.add(Box.createVerticalStrut(10)); // Add spacing
-    topPanel.add(progressPanel);
+    // Add components to download panel
+    downloadPanel.add(buttonPanel);
+    downloadPanel.add(Box.createVerticalStrut(10)); // Add spacing
+    downloadPanel.add(progressPanel);
 
-    panel.add(topPanel, BorderLayout.NORTH);
+    panel.add(downloadPanel, BorderLayout.CENTER);
 
     // Create bottom panel with BoxLayout for horizontal alignment
     JPanel bottomPanel = new JPanel();
