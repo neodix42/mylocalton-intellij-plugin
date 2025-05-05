@@ -15,7 +15,6 @@ import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.io.File;
 import java.io.FileOutputStream;
-import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
@@ -32,6 +31,7 @@ import javax.swing.*;
 import javax.swing.border.TitledBorder;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.SystemUtils;
 import org.jetbrains.annotations.NotNull;
 import org.ton.java.liteclient.LiteClient;
@@ -39,7 +39,6 @@ import org.ton.java.liteclient.LiteClientParser;
 import org.ton.java.liteclient.api.ResultLastBlock;
 
 import static java.util.Objects.isNull;
-import static java.util.Objects.nonNull;
 
 /** Factory for creating the Demo Tool Window. */
 public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
@@ -766,10 +765,9 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
             try {
               // Get the operating system
               String osName = System.getProperty("os.name").toLowerCase();
-
+              String jarFilename = getJarFilename(testnetCheckbox.isSelected());
               if (osName.contains("win")) {
                 // Windows: Use WMIC command to find all process IDs
-                String jarFilename = getJarFilename(testnetCheckbox.isSelected());
                 String wmiCommand =
                     "wmic process where \"CommandLine like '%%"
                         + jarFilename
@@ -804,12 +802,13 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
                   Runtime.getRuntime().exec(p + " " + pid);
                 }
               } else {
-                // Non-Windows: Use process.pid() to get the process ID
-                long pid = process.pid(); // find pid on linux and mac todo
-                LOG.warn("Terminating process with PID: " + pid);
-
-                // For Unix-based systems, use kill -15 (SIGTERM)
-                Runtime.getRuntime().exec("kill -15 " + pid);
+                String[] command = {"/bin/sh", "-c", "jps | grep "+jarFilename +"| awk '{print $1}'"};
+                Process mltProcess = Runtime.getRuntime().exec(command);
+                String pid =
+                        IOUtils.toString(mltProcess.getInputStream(), Charset.defaultCharset());
+                mltProcess.waitFor();
+                LOG.info("kill -SIGTERM " + pid.trim());
+                Runtime.getRuntime().exec("kill -SIGTERM " + pid.trim());
               }
 
               showCopiedMessage("Stopping...");
