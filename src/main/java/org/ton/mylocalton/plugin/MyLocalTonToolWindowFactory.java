@@ -1083,8 +1083,8 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
             TitledBorder.LEFT,
             TitledBorder.TOP));
 
-    // Create a panel for buttons with FlowLayout to place them side by side
-    JPanel buttonPanel = new JPanel();
+    // Create a panel for buttons with GridBagLayout for better alignment
+    JPanel buttonPanel = new JPanel(new GridBagLayout());
     
     // Create Reset button
     resetButton = createResetButton("Reset", project);
@@ -1157,14 +1157,22 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
           }
         });
 
-    // Add Reset button to the left
-    buttonPanel.add(resetButton);
+    // Create constraints for the buttons
+    GridBagConstraints gbc = new GridBagConstraints();
+    gbc.gridx = 0;
+    gbc.gridy = 0;
+    gbc.weightx = 1.0;
+    gbc.anchor = GridBagConstraints.CENTER;
+    gbc.insets = new Insets(5, 5, 5, 5);
     
-    // Add some space between buttons
-    buttonPanel.add(Box.createHorizontalStrut(10));
+    // Add Reset button centered
+    buttonPanel.add(resetButton, gbc);
     
-    // Add Delete button to the right
-    buttonPanel.add(deleteButton);
+    // Move to next position
+    gbc.gridx = 1;
+    
+    // Add Delete button centered
+    buttonPanel.add(deleteButton, gbc);
     
     panel.add(buttonPanel, BorderLayout.CENTER);
     
