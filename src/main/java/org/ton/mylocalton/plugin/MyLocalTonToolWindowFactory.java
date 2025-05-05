@@ -124,7 +124,7 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
       // 1. Installation Section
       JPanel installationPanel = createInstallationPanel(project);
       installationPanel.setAlignmentX(Component.LEFT_ALIGNMENT); // Top align
-      installationPanel.setMaximumSize(new Dimension(Integer.MAX_VALUE, 150)); // Fixed height
+      installationPanel.setMaximumSize(new Dimension(Integer.MAX_VALUE, 160)); // Fixed height
       mainPanel.add(installationPanel);
       mainPanel.add(Box.createVerticalStrut(5)); // Reduced spacing for compactness
 
@@ -242,7 +242,7 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
   }
 
   private JPanel createInstallationPanel(Project project) {
-    JPanel panel = new JPanel(new BorderLayout(10, 10));
+    JPanel panel = new JPanel(new BorderLayout(0, 0));
     panel.setBorder(
         BorderFactory.createTitledBorder(
             BorderFactory.createLineBorder(Color.GRAY),
@@ -251,11 +251,11 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
             TitledBorder.TOP));
     
     // Create version label with a distinct appearance to ensure visibility
-    versionLabel = new JLabel("Version: ");
+    versionLabel = new JLabel(" ");
     versionLabel.setOpaque(true); // Make it opaque
 
-    // Add the version label directly to the panel's NORTH-EAST area
-    JPanel versionPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+    // Add the version label directly to the panel's NORTH-EAST area with minimal height
+    JPanel versionPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 5, 0)); // Reduced vertical padding
     versionPanel.add(versionLabel);
     panel.add(versionPanel, BorderLayout.NORTH);
 
@@ -331,15 +331,22 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
     // Download button panel (centered)
     JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
 
-    // Progress bar panel (centered)
+    // Progress bar panel (centered) with visible border
     JPanel progressPanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
+    progressPanel.setVisible(true); // Make sure the panel is visible
+    progressPanel.setOpaque(true);
+    progressPanel.setPreferredSize(new Dimension(140, 30)); // Ensure panel has size
 
-    // Create progress bar (initially invisible)
+    // Create progress bar (initially invisible with larger size)
     JProgressBar progressBar = new JProgressBar(0, 100);
     progressBar.setValue(0);
     progressBar.setStringPainted(true);
-    progressBar.setPreferredSize(new Dimension(150, 20));
-    progressBar.setVisible(false); // Initially invisible
+    progressBar.setPreferredSize(new Dimension(140, 20)); // Larger size for better visibility
+    progressBar.setVisible(false); // Initially invisible to avoid gray appearance
+    progressBar.setOpaque(true); // Make sure background is visible
+    progressBar.setBackground(progressPanel.getBackground()); // Match panel background exactly
+    progressBar.setBorderPainted(false); // Remove border to eliminate gray edges
+    
     progressPanel.add(progressBar);
 
     // Download button - set initial state based on JAR existence
@@ -358,6 +365,11 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
 
             // Make progress bar visible when Download button is clicked
             progressBar.setVisible(true);
+            progressPanel.setVisible(true); // Make sure the panel containing the progress bar is visible too
+            
+            // Force UI update to ensure progress bar is visible
+            progressPanel.revalidate();
+            progressPanel.repaint();
 
             // Disable the download button during download
             downloadButton.setEnabled(false);
@@ -416,10 +428,13 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
                               downloadButton.setText("DOWNLOADED");
                               downloadButton.setEnabled(false);
                               testnetCheckbox.setEnabled(false);
+                              
+                              // Make sure the progress bar is hidden
+                              progressBar.setVisible(false);
 
                               // Get the bottom panel to add the "Open Location" link
                               JPanel bottomPanel =
-                                  (JPanel) panel.getComponent(1); // Get the bottom panel
+                                  (JPanel) panel.getComponent(2); // Get the bottom panel (SOUTH component)
 
                               // Clear the bottom panel and recreate it
                               bottomPanel.removeAll();
@@ -427,7 +442,7 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
                               // Recreate the bottom panel with the same BoxLayout
                               bottomPanel.setLayout(new BoxLayout(bottomPanel, BoxLayout.X_AXIS));
                               
-                              // Add "Open Location" link to the left side if it doesn't already exist
+                              // Add "Open Location" link to the left side
                               JLabel openLocationLink = createLink("Open Location", project, null);
                               openLocationLink.addMouseListener(
                                   new MouseAdapter() {
@@ -524,9 +539,9 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
         });
     buttonPanel.add(downloadButton);
 
-    // Add components to download panel
+    // Add components to download panel with no spacing
     downloadPanel.add(buttonPanel);
-    downloadPanel.add(Box.createVerticalStrut(10)); // Add spacing
+    // No vertical spacing between button and progress bar
     downloadPanel.add(progressPanel);
 
     panel.add(downloadPanel, BorderLayout.CENTER);
@@ -1188,7 +1203,7 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
                     // directory itself
                     FileUtils.cleanDirectory(mylocaltonDir.toFile());
 
-                    messageLabel.setText("MyLocalTon has been successfully uninstalled.");
+                    messageLabel.setText("MyLocalTon has been successfully uninstalled");
                     Timer hideTimer = new Timer(5000, event -> {
                       messageLabel.setText(" ");
                     });
@@ -1256,15 +1271,42 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
   }
 
   /**
-   * Updates the download button in the Installation panel after deletion.
+   * Updates the installation panel after deletion.
    *
    * @param mainPanel The main panel containing all sections
    */
   private void updateDownloadButtonAfterDeletion(JPanel mainPanel) {
-
+    // Reset download button state
     downloadButton.setText("DOWNLOAD");
     downloadButton.setEnabled(true);
     testnetCheckbox.setEnabled(true);
+    
+    // Reset version label to hide version information
+    versionLabel.setText(" ");
+    
+    // Clear any "Open Location" links from the bottom panel
+    JPanel installationPanel = (JPanel) mainPanel.getComponent(0); // Get the installation panel
+    if (installationPanel != null) {
+      JPanel bottomPanel = (JPanel) installationPanel.getComponent(2); // Get the bottom panel
+      if (bottomPanel != null) {
+        bottomPanel.removeAll();
+        
+        // Recreate the bottom panel with the same BoxLayout
+        bottomPanel.setLayout(new BoxLayout(bottomPanel, BoxLayout.X_AXIS));
+        
+        // Add flexible space to push the checkbox to the right
+        bottomPanel.add(Box.createHorizontalGlue());
+        
+        // Add Testnet checkbox on the right
+        bottomPanel.add(testnetCheckbox);
+        
+        // Add padding around the panel
+        bottomPanel.setBorder(BorderFactory.createEmptyBorder(5, 10, 5, 10));
+        
+        bottomPanel.revalidate();
+        bottomPanel.repaint();
+      }
+    }
   }
 
   /**
@@ -1308,7 +1350,7 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
               hideTimer.setRepeats(false);
               hideTimer.start();
             } else {
-              messageLabel.setText("No blockchain state found.");
+              messageLabel.setText("No blockchain state found");
               Timer hideTimer =
                       new Timer(
                               5000,
