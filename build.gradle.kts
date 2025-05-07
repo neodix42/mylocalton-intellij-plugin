@@ -35,15 +35,15 @@ dependencies {
     val version = providers.gradleProperty("platformVersion")
     create(IntelliJPlatformType.IntellijIdeaCommunity, version)  }
   implementation("commons-io:commons-io:2.19.0")
-  implementation("io.github.neodix42:liteclient:0.9.7")
+  implementation("io.github.neodix42:liteclient:0.9.9")
   implementation("com.googlecode.json-simple:json-simple:1.1.1")
 }
 
 
 intellijPlatform {
   pluginConfiguration {
-    id = "org.ton.intellij-ton"
-    name = "TON"
+    id = "org.ton.mylocalton-intellij"
+    name = "MyLocalTon"
     version = project.version.toString()
     description = """
         TON Blockchain inside IntelliJ: Allows to run local TON blockchain with native explorer and TON HTTP API.

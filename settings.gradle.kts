@@ -15,5 +15,9 @@ dependencyResolutionManagement {
         intellijPlatform {
             defaultRepositories()
         }
+
+        maven {
+            url = uri("C:\\\\Users\\\\namle\\\\.m2\\\\repository")
+        }
     }
 }

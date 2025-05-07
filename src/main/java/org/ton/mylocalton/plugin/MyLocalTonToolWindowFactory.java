@@ -165,7 +165,6 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
               if (isLockFileExists()) {
                 if (isNull(liteClient)) {
                   if (Files.exists(Paths.get(getLiteClientPath(userHomeDir)))) {
-                    LOG.warn("init liteclient");
                     liteClient =
                         LiteClient.builder()
                             .pathToGlobalConfig(getGlobalConfigPath(userHomeDir))
@@ -304,8 +303,14 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
           String versionCommand = "java -jar \"" + jarPath + "\" version";
           LOG.warn("Executing version command on startup: " + versionCommand);
           
-          // Execute the command and capture the output
-          Process versionProcess = Runtime.getRuntime().exec(versionCommand);
+          // Execute the command and capture the output using ProcessBuilder
+          ProcessBuilder processBuilder = new ProcessBuilder();
+          if (SystemUtils.IS_OS_WINDOWS) {
+            processBuilder.command("cmd.exe", "/c", versionCommand);
+          } else {
+            processBuilder.command("sh", "-c", versionCommand);
+          }
+          Process versionProcess = processBuilder.start();
           String versionOutput = IOUtils.toString(versionProcess.getInputStream(), Charset.defaultCharset());
           versionProcess.waitFor();
           
@@ -404,8 +409,14 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
                           String versionCommand = "java -jar \"" + targetPath + "\" version";
                           LOG.warn("Executing version command: " + versionCommand);
                           
-                          // Execute the command and capture the output
-                          Process versionProcess = Runtime.getRuntime().exec(versionCommand);
+                          // Execute the command and capture the output using ProcessBuilder
+                          ProcessBuilder processBuilder = new ProcessBuilder();
+                          if (SystemUtils.IS_OS_WINDOWS) {
+                            processBuilder.command("cmd.exe", "/c", versionCommand);
+                          } else {
+                            processBuilder.command("sh", "-c", versionCommand);
+                          }
+                          Process versionProcess = processBuilder.start();
                           String versionOutput = IOUtils.toString(versionProcess.getInputStream(), Charset.defaultCharset());
                           versionProcess.waitFor();
                           
@@ -857,7 +868,8 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
                         + jarFilename
                         + "%%'\" get ProcessId";
                 LOG.warn("WMI command: " + wmiCommand);
-                Process wmiProcess = Runtime.getRuntime().exec(wmiCommand);
+                ProcessBuilder wmiProcessBuilder = new ProcessBuilder("cmd.exe", "/c", wmiCommand);
+                Process wmiProcess = wmiProcessBuilder.start();
                 String output =
                     IOUtils.toString(wmiProcess.getInputStream(), Charset.defaultCharset());
                 wmiProcess.waitFor();
@@ -883,16 +895,19 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
                 // Terminate each process
                 for (Long pid : pids) {
                   LOG.warn("Sending SIGTERM : " + p + " " + pid);
-                  Runtime.getRuntime().exec(p + " " + pid);
+                  ProcessBuilder terminateProcessBuilder = new ProcessBuilder(p, pid.toString());
+                  terminateProcessBuilder.start();
                 }
               } else {
                 String[] command = {"/bin/sh", "-c", "jps | grep "+jarFilename +"| awk '{print $1}'"};
-                Process mltProcess = Runtime.getRuntime().exec(command);
+                ProcessBuilder processBuilder = new ProcessBuilder(command);
+                Process mltProcess = processBuilder.start();
                 String pid =
                         IOUtils.toString(mltProcess.getInputStream(), Charset.defaultCharset());
                 mltProcess.waitFor();
                 LOG.info("kill -SIGTERM " + pid.trim());
-                Runtime.getRuntime().exec("kill -SIGTERM " + pid.trim());
+                ProcessBuilder killProcessBuilder = new ProcessBuilder("/bin/sh", "-c", "kill -SIGTERM " + pid.trim());
+                killProcessBuilder.start();
               }
 
               showCopiedMessage("Stopping...");
@@ -1475,7 +1490,8 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
 
         String cmd = getDuPath(System.getProperty("user.home"))+" -hs "+path;
         LOG.debug(cmd);
-        Process p = Runtime.getRuntime().exec(cmd);
+        ProcessBuilder processBuilder = new ProcessBuilder("cmd.exe", "/c", cmd);
+        Process p = processBuilder.start();
         InputStream procOutput = p.getInputStream();
 
         resultInput = IOUtils.toString(procOutput, Charset.defaultCharset());
@@ -1491,7 +1507,8 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
       try {
         String cmd = "du -hs " + path;
         LOG.debug(cmd);
-        Process p = Runtime.getRuntime().exec(cmd);
+        ProcessBuilder processBuilder = new ProcessBuilder("/bin/sh", "-c", cmd);
+        Process p = processBuilder.start();
         InputStream procOutput = p.getInputStream();
 
         resultInput = IOUtils.toString(procOutput, Charset.defaultCharset());
