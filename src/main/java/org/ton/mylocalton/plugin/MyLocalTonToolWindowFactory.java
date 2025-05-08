@@ -18,6 +18,8 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
@@ -82,13 +84,21 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
     return Files.exists(lockFilePath);
   }
 
-  // Flag to track if download is in progress
+  // Flags to track states
   private boolean isDownloadInProgress = false;
+  private boolean isProcessRunning = false; // Flag to track if the process is running
 
   /** Updates the status label, button states, and panel states based on the lock file existence and JAR file existence. */
   private void updateStatusLabel() {
     boolean lockExists = isLockFileExists();
     boolean jarExists = checkIfJarExists();
+
+    // Update isProcessRunning flag based on lock file existence
+    if (lockExists) {
+      isProcessRunning = true;
+    } else {
+      isProcessRunning = false;
+    }
 
     if (statusLabel != null) {
       if (lockExists) {
@@ -109,24 +119,13 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
 
     // Disable/enable the startup settings panel based on lock file existence, JAR existence, and download status
     if (startupSettingsPanel != null) {
-      boolean shouldEnable = !lockExists && jarExists && !isDownloadInProgress; // Disable when lock exists, no JAR exists, or download in progress
+      boolean shouldEnable = !lockExists && !isProcessRunning && jarExists && !isDownloadInProgress; // Disable when lock exists, process is running, no JAR exists, or download in progress
       startupSettingsPanel.setEnabled(shouldEnable);
 
       // Recursively disable/enable all components inside the panel
       setEnabledRecursively(startupSettingsPanel, shouldEnable);
     }
-    
-    // Disable/enable the actions panel based on JAR existence and download status
-    // Find the actions panel (index 2 in the main panel)
-    Container mainPanel = startupSettingsPanel.getParent();
-    if (mainPanel != null && mainPanel.getComponentCount() > 2) {
-      Component actionsPanel = mainPanel.getComponent(2);
-      if (actionsPanel instanceof JPanel) {
-        boolean shouldEnable = jarExists && !isDownloadInProgress; // Disable when no JAR exists or download in progress
-        actionsPanel.setEnabled(shouldEnable);
-        setEnabledRecursively((Container) actionsPanel, shouldEnable);
-      }
-    }
+
   }
   
   /**
@@ -215,20 +214,38 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
 
                  last= liteClient.executeLast();
               }
-              if (last.contains("latest masterchain block known to server")) {
-                ResultLastBlock resultLastBlock = LiteClientParser.parseLast(last);
-                startButton.setEnabled(false);
-                stopButton.setEnabled(true);
-                //                          java.util.List<ResultLastBlock> shards =
-                // LiteClientParser.parseAllShards(liteClient.executeAllshards(resultLastBlock));
-                //                        LOG.warn("size last shards "+ size+" "+
-                // resultLastBlock.getSeqno()+" "+shards.size());
-                statusLabel.setText("Block: " + resultLastBlock.getSeqno());
+        if (last.contains("latest masterchain block known to server")) {
+          ResultLastBlock resultLastBlock = LiteClientParser.parseLast(last);
+          startButton.setEnabled(false);
+          stopButton.setEnabled(true);
+          
+          // Make sure the startup panel is disabled when the process is running
+          if (startupSettingsPanel != null) {
+            startupSettingsPanel.setEnabled(false);
+            setEnabledRecursively(startupSettingsPanel, false);
+          }
+          
+          //                          java.util.List<ResultLastBlock> shards =
+          // LiteClientParser.parseAllShards(liteClient.executeAllshards(resultLastBlock));
+          //                        LOG.warn("size last shards "+ size+" "+
+          // resultLastBlock.getSeqno()+" "+shards.size());
+          statusLabel.setText("Block: " + resultLastBlock.getSeqno());
+        } else {
+          updateStatusLabel();
+        }
+            } catch (Exception ex) {
+              // Don't call updateStatusLabel() directly as it might re-enable the panel
+              // Instead, check if the process is running first
+              if (isProcessRunning) {
+                // If process is running, ensure the startup panel stays disabled
+                if (startupSettingsPanel != null) {
+                  startupSettingsPanel.setEnabled(false);
+                  setEnabledRecursively(startupSettingsPanel, false);
+                }
               } else {
+                // Only update the status label if the process is not running
                 updateStatusLabel();
               }
-            } catch (Exception ex) {
-              updateStatusLabel();
             }
           },
           2L,
@@ -834,6 +851,19 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
                     "MyLocalTon Plugin");
                 return;
               }
+              
+              // Set the process running flag to true
+              isProcessRunning = true;
+              
+              // Disable the startup panel when start button is clicked
+              if (startupSettingsPanel != null) {
+                startupSettingsPanel.setEnabled(false);
+                setEnabledRecursively(startupSettingsPanel, false);
+              }
+              
+              // Disable start button and enable stop button
+              startButton.setEnabled(false);
+              stopButton.setEnabled(true);
 
               // Build the command with parameters based on checkbox states
               StringBuilder command = new StringBuilder();
@@ -976,7 +1006,19 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
                 killProcessBuilder.start();
               }
 
+              // Set the process running flag to false
+              isProcessRunning = false;
+              
               showCopiedMessage("Stopping...");
+              
+              // Re-enable the startup panel when stop button is clicked
+              // We'll do this after a short delay to allow the process to stop
+              Timer enableTimer = new Timer(1000, event -> {
+                // Update the status label which will also update the startup panel state
+                updateStatusLabel();
+              });
+              enableTimer.setRepeats(false);
+              enableTimer.start();
 
             } catch (Exception ex) {
               LOG.warn("Error stopping process: " + ex.getMessage(), ex);
@@ -1527,8 +1569,9 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
   }
 
   private void downloadFile(String fileUrl, File targetFile, JProgressBar progressBar)
-      throws IOException {
-    URL url = new URL(fileUrl);
+      throws IOException, URISyntaxException {
+    URI uri = new URI(fileUrl);
+    URL url = uri.toURL();
     HttpURLConnection connection = (HttpURLConnection) url.openConnection();
 
     // Set up the connection
