@@ -4,6 +4,7 @@
 
 ### Changes
 - handle error output on start on Windows
+- improve exit on Ubuntu
  
 - ## [1.0.4]
 ### Changes
