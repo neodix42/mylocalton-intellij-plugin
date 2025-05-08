@@ -13,10 +13,7 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
+import java.io.*;
 import java.net.HttpURLConnection;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -861,7 +858,7 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
               
               // Set the process running flag to true
               isProcessRunning = true;
-              
+
               // Disable the startup panel when start button is clicked
               if (startupSettingsPanel != null) {
                 startupSettingsPanel.setEnabled(false);
@@ -1017,9 +1014,22 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
                 String pid =
                         IOUtils.toString(mltProcess.getInputStream(), Charset.defaultCharset());
                 mltProcess.waitFor();
-                LOG.warn("kill -SIGTERM " + pid.trim());
-                ProcessBuilder killProcessBuilder = new ProcessBuilder(shell, "-c", "kill -SIGTERM " + pid.trim());
-                killProcessBuilder.start();
+                ProcessBuilder killProcessBuilder;
+
+                if (osName.contains("mac")) {
+                  LOG.warn("kill -SIGTERM " + pid.trim());
+                  killProcessBuilder = new ProcessBuilder(shell, "-c", "kill -SIGTERM " + pid.trim());
+                  killProcessBuilder.redirectError(ProcessBuilder.Redirect.to(
+                          new File(SystemUtils.IS_OS_WINDOWS ? "NUL" : "/dev/null")));
+                }
+                else {
+                  LOG.warn("kill -15 " + pid.trim());
+                  killProcessBuilder = new ProcessBuilder("sh", "-c", "kill -15 " + pid.trim());
+                  killProcessBuilder.redirectError(ProcessBuilder.Redirect.to(
+                          new File(SystemUtils.IS_OS_WINDOWS ? "NUL" : "/dev/null")));
+                }
+                Process killerProcess = killProcessBuilder.start();
+                killerProcess.waitFor();
               }
 
               // Set the process running flag to false
@@ -1334,53 +1344,54 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
             if (result == Messages.YES) {
               try {
                 // Get the path to the .mylocalton directory
-                Path mylocaltonDir = Paths.get(System.getProperty("user.home"), ".mylocalton");
+                String userHome = System.getProperty("user.home");
+                Path mylocaltonDir = Paths.get(userHome, ".mylocalton");
 
                 if (Files.exists(mylocaltonDir)) {
                   try {
                     // Delete all files and subdirectories inside the directory, but keep the
                     // directory itself
                     FileUtils.cleanDirectory(mylocaltonDir.toFile());
+                    Path lockFilePath = Paths.get(userHome, "myLocalTon.lock");
+                    Files.delete(lockFilePath);
 
-                    messageLabel.setText("MyLocalTon has been successfully uninstalled");
-                    Timer hideTimer = new Timer(5000, event -> {
-                      messageLabel.setText(" ");
-                    });
-                    hideTimer.setRepeats(false);
-                    hideTimer.start();
-
-                    // Update the download button in the Installation panel
-                    JPanel mainPanel = (JPanel) panel.getParent();
-                    if (mainPanel != null) {
-                      updateDownloadButtonAfterDeletion(mainPanel);
-                      
-                      // Disable startup settings panel
-                      if (startupSettingsPanel != null) {
-                        startupSettingsPanel.setEnabled(false);
-                        setEnabledRecursively(startupSettingsPanel, false);
-                      }
-                      
-                      // Disable actions panel (index 2 in the main panel)
-                      if (mainPanel.getComponentCount() > 2) {
-                        Component actionsPanel = mainPanel.getComponent(2);
-                        if (actionsPanel instanceof JPanel) {
-                          actionsPanel.setEnabled(false);
-                          setEnabledRecursively((Container) actionsPanel, false);
-                        }
-                      }
-                    }
                   } catch (IOException ex) {
                     // If an IOException occurs, it means deletion failed
                     LOG.warn("Failed to delete MyLocalTon content: " + ex.getMessage(), ex);
                     Messages.showErrorDialog(
-                        project,
-                        "Failed to delete MyLocalTon content. Please check if the MyLocalTon process is not running.",
-                        "Deletion Failed");
+                            project,
+                            "Failed to delete MyLocalTon content. Please check if the MyLocalTon process is not running.",
+                            "Deletion Failed");
                   }
-                } else {
-                  Messages.showInfoMessage(
-                      project, "MyLocalTon directory not found.", "MyLocalTon Plugin");
                 }
+                messageLabel.setText("MyLocalTon has been successfully uninstalled");
+                Timer hideTimer = new Timer(5000, event -> {
+                  messageLabel.setText(" ");
+                });
+                hideTimer.setRepeats(false);
+                hideTimer.start();
+
+                // Update the download button in the Installation panel
+                JPanel mainPanel = (JPanel) panel.getParent();
+                if (mainPanel != null) {
+                  updateDownloadButtonAfterDeletion(mainPanel);
+
+                  // Disable startup settings panel
+                  if (startupSettingsPanel != null) {
+                    startupSettingsPanel.setEnabled(false);
+                    setEnabledRecursively(startupSettingsPanel, false);
+                  }
+
+                  // Disable actions panel (index 2 in the main panel)
+                  if (mainPanel.getComponentCount() > 2) {
+                    Component actionsPanel = mainPanel.getComponent(2);
+                    if (actionsPanel instanceof JPanel) {
+                      actionsPanel.setEnabled(false);
+                      setEnabledRecursively((Container) actionsPanel, false);
+                    }
+                  }
+                }
+
               } catch (Exception ex) {
                 LOG.warn("Error deleting MyLocalTon content: " + ex.getMessage(), ex);
                 Messages.showErrorDialog(
@@ -1488,12 +1499,14 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
     button.addActionListener(
         e -> {
           LOG.warn("reset button clicked");
-          Path mylocaltonDir = Paths.get(System.getProperty("user.home"), ".mylocalton/myLocalTon");
+          String userHome = System.getProperty("user.home");
+          Path mylocaltonDir = Paths.get(userHome, ".mylocalton/myLocalTon");
 
           try {
             if (Files.exists(mylocaltonDir)) {
               FileUtils.cleanDirectory(mylocaltonDir.toFile());
-
+              Path lockFilePath = Paths.get(userHome, "myLocalTon.lock");
+              Files.delete(lockFilePath);
               messageLabel.setText("Reset successful. Blockchain state has been cleared.");
               Timer hideTimer =
                   new Timer(

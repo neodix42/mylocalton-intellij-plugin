@@ -16,8 +16,8 @@ dependencyResolutionManagement {
             defaultRepositories()
         }
 
-        maven {
-            url = uri("C:\\\\Users\\\\namle\\\\.m2\\\\repository")
-        }
+//        maven {
+//            url = uri("C:\\\\Users\\\\namle\\\\.m2\\\\repository")
+//        }
     }
 }
