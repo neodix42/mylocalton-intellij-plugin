@@ -366,6 +366,9 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
           } else {
             processBuilder.command("sh", "-c", versionCommand);
           }
+          // Redirect error output to NUL to suppress the error messages
+          processBuilder.redirectError(ProcessBuilder.Redirect.to(
+              new File(SystemUtils.IS_OS_WINDOWS ? "NUL" : "/dev/null")));
           Process versionProcess = processBuilder.start();
           String versionOutput = IOUtils.toString(versionProcess.getInputStream(), Charset.defaultCharset());
           versionProcess.waitFor();
@@ -491,6 +494,9 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
                           } else {
                             processBuilder.command("sh", "-c", versionCommand);
                           }
+                          // Redirect error output to NUL to suppress the error messages
+                          processBuilder.redirectError(ProcessBuilder.Redirect.to(
+                              new File(SystemUtils.IS_OS_WINDOWS ? "NUL" : "/dev/null")));
                           Process versionProcess = processBuilder.start();
                           String versionOutput = IOUtils.toString(versionProcess.getInputStream(), Charset.defaultCharset());
                           versionProcess.waitFor();
