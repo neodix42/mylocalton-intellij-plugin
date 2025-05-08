@@ -82,6 +82,9 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
     return Files.exists(lockFilePath);
   }
 
+  // Flag to track if download is in progress
+  private boolean isDownloadInProgress = false;
+
   /** Updates the status label, button states, and panel states based on the lock file existence and JAR file existence. */
   private void updateStatusLabel() {
     boolean lockExists = isLockFileExists();
@@ -97,29 +100,29 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
 
     // Update button states based on lock file existence
     if (startButton != null) {
-      startButton.setEnabled(!lockExists && jarExists); // Disable Start when lock exists or no JAR exists
+      startButton.setEnabled(!lockExists && jarExists && !isDownloadInProgress); // Disable Start when lock exists, no JAR exists, or download in progress
     }
 
     if (stopButton != null) {
-      stopButton.setEnabled(lockExists); // Disable Stop when lock doesn't exist
+      stopButton.setEnabled(lockExists && !isDownloadInProgress); // Disable Stop when lock doesn't exist or download in progress
     }
 
-    // Disable/enable the startup settings panel based on lock file existence and JAR existence
+    // Disable/enable the startup settings panel based on lock file existence, JAR existence, and download status
     if (startupSettingsPanel != null) {
-      boolean shouldEnable = !lockExists && jarExists; // Disable when lock exists or no JAR exists
+      boolean shouldEnable = !lockExists && jarExists && !isDownloadInProgress; // Disable when lock exists, no JAR exists, or download in progress
       startupSettingsPanel.setEnabled(shouldEnable);
 
       // Recursively disable/enable all components inside the panel
       setEnabledRecursively(startupSettingsPanel, shouldEnable);
     }
     
-    // Disable/enable the actions panel based on JAR existence
+    // Disable/enable the actions panel based on JAR existence and download status
     // Find the actions panel (index 2 in the main panel)
     Container mainPanel = startupSettingsPanel.getParent();
     if (mainPanel != null && mainPanel.getComponentCount() > 2) {
       Component actionsPanel = mainPanel.getComponent(2);
       if (actionsPanel instanceof JPanel) {
-        boolean shouldEnable = jarExists; // Disable when no JAR exists
+        boolean shouldEnable = jarExists && !isDownloadInProgress; // Disable when no JAR exists or download in progress
         actionsPanel.setEnabled(shouldEnable);
         setEnabledRecursively((Container) actionsPanel, shouldEnable);
       }
@@ -411,9 +414,28 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
             progressPanel.revalidate();
             progressPanel.repaint();
 
+            // Set download in progress flag
+            isDownloadInProgress = true;
+            
             // Disable the download button during download
             downloadButton.setEnabled(false);
             testnetCheckbox.setEnabled(false);
+            
+            // Disable startup settings panel and actions panel during download
+            if (startupSettingsPanel != null) {
+              startupSettingsPanel.setEnabled(false);
+              setEnabledRecursively(startupSettingsPanel, false);
+            }
+            
+            // Disable actions panel (index 2 in the main panel)
+            Container mainPanel = panel.getParent();
+            if (mainPanel != null && mainPanel.getComponentCount() > 2) {
+              Component actionsPanel = mainPanel.getComponent(2);
+              if (actionsPanel instanceof JPanel) {
+                actionsPanel.setEnabled(false);
+                setEnabledRecursively((Container) actionsPanel, false);
+              }
+            }
 
             // Create a thread for downloading the file
             new Thread(
@@ -470,6 +492,9 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
                         // Show success message
                         SwingUtilities.invokeLater(
                             () -> {
+                              // Reset download in progress flag
+                              isDownloadInProgress = false;
+                              
                               // Change download button text and keep it disabled
                               downloadButton.setText("DOWNLOADED");
                               downloadButton.setEnabled(false);
@@ -531,6 +556,9 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
 
                               bottomPanel.revalidate();
                               bottomPanel.repaint();
+                              
+                              // Now that download is successful, update the status label and enable buttons
+                              updateStatusLabel();
 
                               Messages.showInfoMessage(
                                   project,
@@ -541,6 +569,9 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
                         LOG.warn("Error downloading file: " + ex.getMessage(), ex);
                         SwingUtilities.invokeLater(
                             () -> {
+                              // Reset download in progress flag
+                              isDownloadInProgress = false;
+                              
                               progressBar.setVisible(false);
 
                               // Get the bottom panel to add the "Download failed" label
