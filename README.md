@@ -31,8 +31,8 @@ This IntelliJ plugin allows you locally to run the TON blockchain (www.ton.org).
 Based on [The Open Network](https://ton.org)
 
 <!-- Badges -->
-[plugin-repo]: https://plugins.jetbrains.com/plugin/x-ton
-[plugin-version-svg]: https://img.shields.io/jetbrains/plugin/v/x-ton.svg
-[plugin-downloads-svg]: https://img.shields.io/jetbrains/plugin/d/x-ton.svg
+[plugin-repo]: https://plugins.jetbrains.com/plugin/27295-mylocalton
+[plugin-version-svg]: https://img.shields.io/jetbrains/plugin/v/27295-mylocalton.svg
+[plugin-downloads-svg]: https://img.shields.io/jetbrains/plugin/d/27295-mylocalton.svg
 [ton-svg]: https://img.shields.io/badge/Based%20on-TON-blue
 [ton]: https://ton.org
