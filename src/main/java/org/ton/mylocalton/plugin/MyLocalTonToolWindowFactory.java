@@ -26,6 +26,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -995,14 +996,23 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
                   terminateProcessBuilder.start();
                 }
               } else {
-                String[] command = {"/bin/sh", "-c", "jps | grep "+jarFilename +"| awk '{print $1}'"};
+
+                String shell;
+                if (osName.contains("mac")) {
+                  shell = "/bin/zsh";
+                }
+                else {
+                  shell = "/bin/sh";
+                }
+                String[] command = {shell, "-c", "jps | grep " + jarFilename + "| awk '{print $1}'"};
+                LOG.warn("cmd: "+ Arrays.toString(command));
                 ProcessBuilder processBuilder = new ProcessBuilder(command);
                 Process mltProcess = processBuilder.start();
                 String pid =
                         IOUtils.toString(mltProcess.getInputStream(), Charset.defaultCharset());
                 mltProcess.waitFor();
-                LOG.info("kill -SIGTERM " + pid.trim());
-                ProcessBuilder killProcessBuilder = new ProcessBuilder("/bin/sh", "-c", "kill -SIGTERM " + pid.trim());
+                LOG.warn("kill -SIGTERM " + pid.trim());
+                ProcessBuilder killProcessBuilder = new ProcessBuilder(shell, "-c", "kill -SIGTERM " + pid.trim());
                 killProcessBuilder.start();
               }
 
