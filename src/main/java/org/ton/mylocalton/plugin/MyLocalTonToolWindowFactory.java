@@ -82,9 +82,10 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
     return Files.exists(lockFilePath);
   }
 
-  /** Updates the status label, button states, and panel states based on the lock file existence. */
+  /** Updates the status label, button states, and panel states based on the lock file existence and JAR file existence. */
   private void updateStatusLabel() {
     boolean lockExists = isLockFileExists();
+    boolean jarExists = checkIfJarExists();
 
     if (statusLabel != null) {
       if (lockExists) {
@@ -96,20 +97,54 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
 
     // Update button states based on lock file existence
     if (startButton != null) {
-      startButton.setEnabled(!lockExists); // Disable Start when lock exists
+      startButton.setEnabled(!lockExists && jarExists); // Disable Start when lock exists or no JAR exists
     }
 
     if (stopButton != null) {
       stopButton.setEnabled(lockExists); // Disable Stop when lock doesn't exist
     }
 
-    // Disable/enable the startup settings panel based on lock file existence
+    // Disable/enable the startup settings panel based on lock file existence and JAR existence
     if (startupSettingsPanel != null) {
-      startupSettingsPanel.setEnabled(!lockExists); // Disable when lock exists
+      boolean shouldEnable = !lockExists && jarExists; // Disable when lock exists or no JAR exists
+      startupSettingsPanel.setEnabled(shouldEnable);
 
       // Recursively disable/enable all components inside the panel
-      setEnabledRecursively(startupSettingsPanel, !lockExists);
+      setEnabledRecursively(startupSettingsPanel, shouldEnable);
     }
+    
+    // Disable/enable the actions panel based on JAR existence
+    // Find the actions panel (index 2 in the main panel)
+    Container mainPanel = startupSettingsPanel.getParent();
+    if (mainPanel != null && mainPanel.getComponentCount() > 2) {
+      Component actionsPanel = mainPanel.getComponent(2);
+      if (actionsPanel instanceof JPanel) {
+        boolean shouldEnable = jarExists; // Disable when no JAR exists
+        actionsPanel.setEnabled(shouldEnable);
+        setEnabledRecursively((Container) actionsPanel, shouldEnable);
+      }
+    }
+  }
+  
+  /**
+   * Checks if any JAR file exists (both mainnet and testnet versions for both architectures).
+   *
+   * @return true if any JAR file exists, false otherwise
+   */
+  private boolean checkIfJarExists() {
+    Path downloadDir = Paths.get(System.getProperty("user.home"), ".mylocalton");
+
+    // Check for mainnet JAR files
+    Path mainnetX86JarPath = downloadDir.resolve("MyLocalTon-x86-64.jar");
+    Path mainnetArmJarPath = downloadDir.resolve("MyLocalTon-arm64.jar");
+
+    // Check for testnet JAR files
+    Path testnetX86JarPath = downloadDir.resolve("MyLocalTon-x86-64-testnet.jar");
+    Path testnetArmJarPath = downloadDir.resolve("MyLocalTon-arm64-testnet.jar");
+
+    // Check if any JAR file exists
+    return Files.exists(mainnetX86JarPath) || Files.exists(mainnetArmJarPath) ||
+           Files.exists(testnetX86JarPath) || Files.exists(testnetArmJarPath);
   }
 
   @Override
@@ -1229,6 +1264,21 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
                     JPanel mainPanel = (JPanel) panel.getParent();
                     if (mainPanel != null) {
                       updateDownloadButtonAfterDeletion(mainPanel);
+                      
+                      // Disable startup settings panel
+                      if (startupSettingsPanel != null) {
+                        startupSettingsPanel.setEnabled(false);
+                        setEnabledRecursively(startupSettingsPanel, false);
+                      }
+                      
+                      // Disable actions panel (index 2 in the main panel)
+                      if (mainPanel.getComponentCount() > 2) {
+                        Component actionsPanel = mainPanel.getComponent(2);
+                        if (actionsPanel instanceof JPanel) {
+                          actionsPanel.setEnabled(false);
+                          setEnabledRecursively((Container) actionsPanel, false);
+                        }
+                      }
                     }
                   } catch (IOException ex) {
                     // If an IOException occurs, it means deletion failed
