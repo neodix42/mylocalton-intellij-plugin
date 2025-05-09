@@ -765,7 +765,7 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
 
     // Initialize the checkboxes and combobox as class variables
     tonHttpApiV2 = new JCheckBox("TON HTTP API v2");
-    tonHttpApiV2.setToolTipText("Enables ton-http-api service on start.");
+    tonHttpApiV2.setToolTipText("Enables ton-http-api service on start. Install it manually first. Refer to github.com/neodix42/mylocalton");
     webExplorer = new JCheckBox("Web explorer");
     webExplorer.setToolTipText("Enables native TON blockchain web explorer on start.");
     dataGenerator = new JCheckBox("Data generator");
