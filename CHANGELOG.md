@@ -1,5 +1,11 @@
 # MyLocalTon Plugin for the IntelliJ IDEs Changelog
 
+
+## [1.0.6]
+
+### Changes
+- update hint to install ton-http-api manually
+
 ## [1.0.5]
 
 ### Changes
