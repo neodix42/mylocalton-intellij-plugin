@@ -1,5 +1,11 @@
 # MyLocalTon Plugin for the IntelliJ IDEs Changelog
 
+## [1.0.7]
+
+### Changes
+- use bundled intellij java instead of system's one
+- update ton4j to v0.9.9
+- improve error handling
 
 ## [1.0.6]
 
