@@ -7,6 +7,7 @@
   </description>
 
   <depends>com.intellij.modules.platform</depends>
+  <idea-version since-build="241" until-build="999.*"/>
 
   <extensions defaultExtensionNs="com.intellij">
     <!-- Register a tool window -->
