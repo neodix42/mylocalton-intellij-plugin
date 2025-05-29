@@ -1,5 +1,11 @@
 # MyLocalTon Plugin for the IntelliJ IDEs Changelog
 
+## [1.0.8]
+
+### Changes
+- rework bundle intellij sdk detection
+- show error message if Java < 21
+
 ## [1.0.7]
 
 ### Changes

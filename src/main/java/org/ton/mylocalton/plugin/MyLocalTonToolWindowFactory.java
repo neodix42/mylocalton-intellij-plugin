@@ -33,6 +33,8 @@ import java.util.Arrays;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import javax.swing.*;
 import javax.swing.border.TitledBorder;
 import org.apache.commons.io.FileUtils;
@@ -278,10 +280,17 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
       LOG.warn("Tool window content created successfully");
 
       String versionCommand =
-              getJavaExecutableFromProject(project)
+              getBundledJrePath("java")
                       + " --version ";
       final String version = executeProcess(versionCommand);
       LOG.warn("Java Version detected: " + version);
+
+      if (extractJavaMajorVersion(version) < 21 ) {
+        Messages.showInfoMessage(
+                project,
+                "Old Java version detected ("+extractJavaMajorVersion(version)+"). MyLocalTon Plugin requires Java 21 or higher.",
+                "MyLocalTon Plugin");
+      }
     } catch (Exception e) {
       LOG.warn("Error creating tool window content: " + e.getMessage(), e);
     }
@@ -393,7 +402,7 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
 
                   // Build the command to execute the JAR with "version" parameter
                   String versionCommand =
-                      getJavaExecutableFromProject(project) + " -jar \"" + jarPath + "\" version";
+                          getBundledJrePath("java") + " -jar \"" + jarPath + "\" version";
                   LOG.warn("Executing version command on startup: " + versionCommand);
 
                   // Execute the command and capture the output using ProcessBuilder
@@ -464,6 +473,20 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
           public void actionPerformed(ActionEvent e) {
             LOG.warn("Download button clicked");
 
+            String verCommand =
+                    getBundledJrePath("java")
+                            + " --version ";
+            final String ver = executeProcess(verCommand);
+            LOG.warn("Java Version detected: " + ver);
+
+            if (extractJavaMajorVersion(ver) < 21 ) {
+              Messages.showInfoMessage(
+                      project,
+                      "Old Java version detected ("+extractJavaMajorVersion(ver)+"). MyLocalTon Plugin requires Java 21 or higher.",
+                      "MyLocalTon Plugin");
+              return;
+            }
+
             // Get testnet checkbox state
             boolean isTestnet = testnetCheckbox.isSelected();
 
@@ -526,7 +549,7 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
                         try {
                           // Build the command to execute the JAR with "version" parameter
                           String versionCommand =
-                              getJavaExecutableFromProject(project)
+                                  getBundledJrePath("java")
                                   + " -jar \""
                                   + targetPath
                                   + "\" version";
@@ -730,8 +753,10 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
     return panel;
   }
 
-  private static @NotNull String executeProcess(String versionCommand) throws IOException, InterruptedException {
+  private static @NotNull String executeProcess(String versionCommand) {
     LOG.warn("Executing version command: " + versionCommand);
+
+    try {
 
     // Execute the command and capture the output using ProcessBuilder
     ProcessBuilder processBuilder = new ProcessBuilder();
@@ -751,8 +776,11 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
     versionProcess.waitFor();
 
     // Trim the output and update the version label
-    final String version = versionOutput.trim();
-    return version;
+    return versionOutput.trim();
+    }
+    catch (Exception e) {
+      return "";
+    }
   }
 
   /**
@@ -937,7 +965,7 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
               // Build the command with parameters based on checkbox states
               StringBuilder command = new StringBuilder();
               command
-                  .append(getJavaExecutableFromProject(project) + " -jar \"")
+                  .append(getBundledJrePath("java") + " -jar \"")
                   .append(jarPath)
                   .append("\"");
 
@@ -1075,7 +1103,7 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
               String[] command = {
                 shell,
                 "-c",
-                getJpsExecutableFromProject(project)
+                      getBundledJrePath("jps")
                     + " | grep "
                     + jarFilename
                     + "| awk '{print $1}'"
@@ -1759,77 +1787,106 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
       }
     }
   }
-  public static String getBundledJrePath() {
+  public static String getBundledJrePath(String executable) {
+    try {
     for (Sdk sdk : ProjectJdkTable.getInstance().getAllJdks()) {
       SdkTypeId sdkType = sdk.getSdkType();
-      LOG.info("sdkType: " + sdkType.getName());
+      LOG.warn("sdkType: " + sdkType.getName());
       if (sdkType instanceof SdkType) {
-        return sdk.getHomePath() + "/bin/java";
+        return sdk.getHomePath() + "/bin/"+executable;
       }
     }
-    return null;
-  }
-
-  public static String getJavaExecutableFromProject(Project project) {
-    try {
-      LOG.warn("idea.config.path = "+System.getProperty("idea.config.path"));
-      LOG.warn("getBundledJrePath = "+getBundledJrePath());
-      Sdk sdk = ProjectRootManager.getInstance(project).getProjectSdk();
-      String sdkHome;
-      if (sdk != null) {
-        sdkHome = sdk.getHomePath();
-      } else {
-        LOG.error("Cannot get project sdk, trying to get sdkHome");
-        sdkHome = System.getProperty("java.home");
-      }
-
-    if (sdkHome == null) {
-      LOG.error("Cannot get sdkHome");
-      Messages.showErrorDialog(
-              project,
-              "Cannot locate JAVA HOME. Is Java installed?",
-              "Java Not Found");
-    }
-
-      return sdkHome
+      return System.getProperty("java.home")
               + File.separator
               + "bin"
               + File.separator
-              + (SystemInfo.isWindows ? "java.exe" : "java");
-    }
-    catch (Exception e) {
-      LOG.error("Cannot get sdkHome, "+e.getMessage());
-      return "java";
-    }
-  }
+              + (SystemInfo.isWindows ? executable+".exe" : executable);
 
-  public static String getJpsExecutableFromProject(Project project) {
-    try {
-      Sdk sdk = ProjectRootManager.getInstance(project).getProjectSdk();
-      String sdkHome;
-      if (sdk != null) {
-        sdkHome = sdk.getHomePath();
-      } else {
-        LOG.error("Cannot get project sdk, trying to get sdkHome");
-        sdkHome = System.getProperty("java.home");
-      }
-
-      if (sdkHome == null) {
-        LOG.error("Cannot get sdkHome");
-        Messages.showErrorDialog(
-                project,
-                "Cannot locate JAVA HOME. Is Java installed?",
-                "Java Not Found");
-      }
-
-      return sdkHome
-              + File.separator
-              + "bin"
-              + File.separator
-              + (SystemInfo.isWindows ? "jps.exe" : "jps");
     } catch (Exception e) {
-      LOG.error("Cannot get sdkHome, " + e.getMessage());
-      return "java";
+      LOG.error(e.getMessage(), e);
+      return executable;
     }
+  }
+//
+//  public static String getJavaExecutableFromProject(Project project) {
+//    try {
+//      LOG.warn("idea.config.path = "+System.getProperty("idea.config.path"));
+//      Sdk sdk = ProjectRootManager.getInstance(project).getProjectSdk();
+//      String sdkHome;
+//      if (sdk != null) {
+//        sdkHome = sdk.getHomePath();
+//      } else {
+//        LOG.error("Cannot get project sdk, trying to get sdkHome");
+//        sdkHome = System.getProperty("java.home");
+//      }
+//
+//    if (sdkHome == null) {
+//      LOG.error("Cannot get sdkHome");
+//      Messages.showErrorDialog(
+//              project,
+//              "Cannot locate JAVA HOME. Is Java installed?",
+//              "Java Not Found");
+//    }
+//
+//      return sdkHome
+//              + File.separator
+//              + "bin"
+//              + File.separator
+//              + (SystemInfo.isWindows ? "java.exe" : "java");
+//    }
+//    catch (Exception e) {
+//      LOG.error("Cannot get sdkHome, "+e.getMessage());
+//      return "java";
+//    }
+//  }
+//
+//  public static String getJpsExecutableFromProject(Project project) {
+//    try {
+//      Sdk sdk = ProjectRootManager.getInstance(project).getProjectSdk();
+//      String sdkHome;
+//      if (sdk != null) {
+//        sdkHome = sdk.getHomePath();
+//      } else {
+//        LOG.error("Cannot get project sdk, trying to get sdkHome");
+//        sdkHome = System.getProperty("java.home");
+//      }
+//
+//      if (sdkHome == null) {
+//        LOG.error("Cannot get sdkHome");
+//        Messages.showErrorDialog(
+//                project,
+//                "Cannot locate JAVA HOME. Is Java installed?",
+//                "Java Not Found");
+//      }
+//
+//      return sdkHome
+//              + File.separator
+//              + "bin"
+//              + File.separator
+//              + (SystemInfo.isWindows ? "jps.exe" : "jps");
+//    } catch (Exception e) {
+//      LOG.error("Cannot get sdkHome, " + e.getMessage());
+//      return "java";
+//    }
+//  }
+
+  public static int extractJavaMajorVersion(String javaVersionOutput) {
+    if (javaVersionOutput == null || javaVersionOutput.isEmpty()) {
+      return 0;
+    }
+
+    // Match any line with a version number like 21.0.6, 17.0.2, etc.
+    Pattern pattern = Pattern.compile("(\\d+)\\.\\d+\\.\\d+");
+    Matcher matcher = pattern.matcher(javaVersionOutput);
+
+    if (matcher.find()) {
+      try {
+        return Integer.parseInt(matcher.group(1));
+      } catch (NumberFormatException e) {
+        // Handle exception if needed
+      }
+    }
+
+    return 0;
   }
 }
