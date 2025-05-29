@@ -1,5 +1,10 @@
 # MyLocalTon Plugin for the IntelliJ IDEs Changelog
 
+## [1.0.9]
+
+### Changes
+- windows and macOS fixes
+
 ## [1.0.8]
 
 ### Changes
