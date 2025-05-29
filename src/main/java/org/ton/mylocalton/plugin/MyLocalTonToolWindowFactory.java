@@ -2,7 +2,10 @@ package org.ton.mylocalton.plugin;
 
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.projectRoots.ProjectJdkTable;
 import com.intellij.openapi.projectRoots.Sdk;
+import com.intellij.openapi.projectRoots.SdkType;
+import com.intellij.openapi.projectRoots.SdkTypeId;
 import com.intellij.openapi.roots.ProjectRootManager;
 import com.intellij.openapi.ui.Messages;
 import com.intellij.openapi.util.SystemInfo;
@@ -1756,9 +1759,21 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
       }
     }
   }
+  public static String getBundledJrePath() {
+    for (Sdk sdk : ProjectJdkTable.getInstance().getAllJdks()) {
+      SdkTypeId sdkType = sdk.getSdkType();
+      LOG.info("sdkType: " + sdkType.getName());
+      if (sdkType instanceof SdkType) {
+        return sdk.getHomePath() + "/bin/java";
+      }
+    }
+    return null;
+  }
 
   public static String getJavaExecutableFromProject(Project project) {
     try {
+      LOG.warn("idea.config.path = "+System.getProperty("idea.config.path"));
+      LOG.warn("getBundledJrePath = "+getBundledJrePath());
       Sdk sdk = ProjectRootManager.getInstance(project).getProjectSdk();
       String sdkHome;
       if (sdk != null) {
