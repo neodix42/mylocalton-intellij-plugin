@@ -47,7 +47,7 @@ intellijPlatform {
     version = project.version.toString()
     description = """
         TON Blockchain inside IntelliJ: Allows to run local TON blockchain with native explorer and TON HTTP API.
-        Ideal for quick smart-contract development using third-party TON libraries such ton-kotlin or ton4j.
+        Ideal for quick smart-contract development using third-party TON libraries such as ton-kotlin or ton4j.
         """.trimIndent()
     changeNotes.set(
       provider {
