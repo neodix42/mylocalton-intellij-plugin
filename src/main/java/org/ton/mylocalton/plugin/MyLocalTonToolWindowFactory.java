@@ -34,7 +34,6 @@ import javax.swing.*;
 import javax.swing.border.TitledBorder;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.SystemUtils;
 import org.jetbrains.annotations.NotNull;
 import org.ton.ton4j.liteclient.LiteClient;
@@ -274,6 +273,12 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
           TimeUnit.SECONDS);
 
       LOG.warn("Tool window content created successfully");
+
+      String versionCommand =
+              getJavaExecutableFromProject(project)
+                      + " --version ";
+      final String version = executeProcess(versionCommand);
+      LOG.warn("Java Version detected: " + version);
     } catch (Exception e) {
       LOG.warn("Error creating tool window content: " + e.getMessage(), e);
     }
@@ -406,7 +411,6 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
 
                   // Trim the output and update the version label
                   final String version = versionOutput.trim();
-                  LOG.warn("Version detected on startup: " + version);
 
                   // Update the version label in the UI thread
                   SwingUtilities.invokeLater(
@@ -523,28 +527,8 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
                                   + " -jar \""
                                   + targetPath
                                   + "\" version";
-                          LOG.warn("Executing version command: " + versionCommand);
-
-                          // Execute the command and capture the output using ProcessBuilder
-                          ProcessBuilder processBuilder = new ProcessBuilder();
-                          if (SystemUtils.IS_OS_WINDOWS) {
-                            processBuilder.command("cmd.exe", "/c", versionCommand);
-                          } else {
-                            processBuilder.command("sh", "-c", versionCommand);
-                          }
-                          // Redirect error output to NUL to suppress the error messages
-                          processBuilder.redirectError(
-                              ProcessBuilder.Redirect.to(
-                                  new File(SystemUtils.IS_OS_WINDOWS ? "NUL" : "/dev/null")));
-                          Process versionProcess = processBuilder.start();
-                          String versionOutput =
-                              IOUtils.toString(
-                                  versionProcess.getInputStream(), Charset.defaultCharset());
-                          versionProcess.waitFor();
-
-                          // Trim the output and update the version label
-                          final String version = versionOutput.trim();
-                          LOG.warn("Version detected: " + version);
+                          final String version = executeProcess(versionCommand);
+                          LOG.warn("MyLocalTon Version detected: " + version);
 
                           // Update the version label in the UI thread
                           SwingUtilities.invokeLater(
@@ -741,6 +725,31 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
     panel.add(bottomPanel, BorderLayout.SOUTH);
 
     return panel;
+  }
+
+  private static @NotNull String executeProcess(String versionCommand) throws IOException, InterruptedException {
+    LOG.warn("Executing version command: " + versionCommand);
+
+    // Execute the command and capture the output using ProcessBuilder
+    ProcessBuilder processBuilder = new ProcessBuilder();
+    if (SystemUtils.IS_OS_WINDOWS) {
+      processBuilder.command("cmd.exe", "/c", versionCommand);
+    } else {
+      processBuilder.command("sh", "-c", versionCommand);
+    }
+    // Redirect error output to NUL to suppress the error messages
+    processBuilder.redirectError(
+        ProcessBuilder.Redirect.to(
+            new File(SystemUtils.IS_OS_WINDOWS ? "NUL" : "/dev/null")));
+    Process versionProcess = processBuilder.start();
+    String versionOutput =
+        IOUtils.toString(
+            versionProcess.getInputStream(), Charset.defaultCharset());
+    versionProcess.waitFor();
+
+    // Trim the output and update the version label
+    final String version = versionOutput.trim();
+    return version;
   }
 
   /**
@@ -1749,14 +1758,15 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
   }
 
   public static String getJavaExecutableFromProject(Project project) {
-    Sdk sdk = ProjectRootManager.getInstance(project).getProjectSdk();
-    String sdkHome;
-    if (sdk != null) {
-      sdkHome = sdk.getHomePath();
-    } else {
-      LOG.error("Cannot get project sdk, trying to get sdkHome");
-      sdkHome = System.getProperty("java.home");
-    }
+    try {
+      Sdk sdk = ProjectRootManager.getInstance(project).getProjectSdk();
+      String sdkHome;
+      if (sdk != null) {
+        sdkHome = sdk.getHomePath();
+      } else {
+        LOG.error("Cannot get project sdk, trying to get sdkHome");
+        sdkHome = System.getProperty("java.home");
+      }
 
     if (sdkHome == null) {
       LOG.error("Cannot get sdkHome");
@@ -1766,35 +1776,45 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
               "Java Not Found");
     }
 
-    return sdkHome
-        + File.separator
-        + "bin"
-        + File.separator
-        + (SystemInfo.isWindows ? "java.exe" : "java");
+      return sdkHome
+              + File.separator
+              + "bin"
+              + File.separator
+              + (SystemInfo.isWindows ? "java.exe" : "java");
+    }
+    catch (Exception e) {
+      LOG.error("Cannot get sdkHome, "+e.getMessage());
+      return "java";
+    }
   }
 
   public static String getJpsExecutableFromProject(Project project) {
-    Sdk sdk = ProjectRootManager.getInstance(project).getProjectSdk();
-    String sdkHome;
-    if (sdk != null) {
-      sdkHome = sdk.getHomePath();
-    } else {
-      LOG.error("Cannot get project sdk, trying to get sdkHome");
-      sdkHome = System.getProperty("java.home");
-    }
+    try {
+      Sdk sdk = ProjectRootManager.getInstance(project).getProjectSdk();
+      String sdkHome;
+      if (sdk != null) {
+        sdkHome = sdk.getHomePath();
+      } else {
+        LOG.error("Cannot get project sdk, trying to get sdkHome");
+        sdkHome = System.getProperty("java.home");
+      }
 
-    if (sdkHome == null) {
-      LOG.error("Cannot get sdkHome");
-      Messages.showErrorDialog(
-              project,
-              "Cannot locate JAVA HOME. Is Java installed?",
-              "Java Not Found");
-    }
+      if (sdkHome == null) {
+        LOG.error("Cannot get sdkHome");
+        Messages.showErrorDialog(
+                project,
+                "Cannot locate JAVA HOME. Is Java installed?",
+                "Java Not Found");
+      }
 
-    return sdkHome
-        + File.separator
-        + "bin"
-        + File.separator
-        + (SystemInfo.isWindows ? "jps.exe" : "jps");
+      return sdkHome
+              + File.separator
+              + "bin"
+              + File.separator
+              + (SystemInfo.isWindows ? "jps.exe" : "jps");
+    } catch (Exception e) {
+      LOG.error("Cannot get sdkHome, " + e.getMessage());
+      return "java";
+    }
   }
 }
