@@ -1,5 +1,10 @@
 # MyLocalTon Plugin for the IntelliJ IDEs Changelog
 
+## [1.0.10]
+
+### Changes
+- improve java path detection
+
 ## [1.0.9]
 
 ### Changes

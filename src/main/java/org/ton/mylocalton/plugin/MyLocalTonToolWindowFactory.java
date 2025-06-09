@@ -40,6 +40,7 @@ import javax.swing.*;
 import javax.swing.border.TitledBorder;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.SystemUtils;
 import org.jetbrains.annotations.NotNull;
 import org.ton.ton4j.liteclient.LiteClient;
@@ -278,18 +279,6 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
 
       LOG.warn("Tool window content created successfully");
 
-      String versionCommand = "\"" + getBundledJrePath("java") + "\"" + " --version";
-      final String version = executeProcess(versionCommand);
-      LOG.warn("Java Version detected: " + version);
-
-      if (extractJavaMajorVersion(version) < 21) {
-        Messages.showInfoMessage(
-            project,
-            "Old Java version detected ("
-                + extractJavaMajorVersion(version)
-                + "). MyLocalTon Plugin requires Java 21 or higher.",
-            "MyLocalTon Plugin");
-      }
     } catch (Exception e) {
       LOG.warn("Error creating tool window content: " + e.getMessage(), e);
     }
@@ -399,13 +388,8 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
                         Files.exists(mainnetArmJarPath) ? mainnetArmJarPath : mainnetX86JarPath;
                   }
 
-                  // Build the command to execute the JAR with "version" parameter
-                  String versionCommand =
-                      "\"" + getBundledJrePath("java") + "\" -jar \"" + jarPath + "\" version";
-                  LOG.warn("Executing version command on startup: " + versionCommand);
-
                   // Trim the output and update the version label
-                  final String version = executeProcess(versionCommand);
+                  final String version = getMyLocalTonVersion(jarPath.toString());
 
                   // Update the version label in the UI thread
                   SwingUtilities.invokeLater(
@@ -456,17 +440,18 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
           public void actionPerformed(ActionEvent e) {
             LOG.warn("Download button clicked");
 
-            String verCommand = "\"" + getBundledJrePath("java") + "\"" + " --version";
-            final String ver = executeProcess(verCommand);
+            String ver = getJavaVersion();
             LOG.warn("Java Version detected: " + ver);
 
             if (extractJavaMajorVersion(ver) < 21) {
-              Messages.showInfoMessage(
-                  project,
-                  "Old Java version detected ("
-                      + extractJavaMajorVersion(ver)
-                      + "). MyLocalTon Plugin requires Java 21 or higher.",
-                  "MyLocalTon Plugin");
+              SwingUtilities.invokeLater(
+                  () ->
+                      Messages.showInfoMessage(
+                          project,
+                          "Old Java version detected ("
+                              + extractJavaMajorVersion(ver)
+                              + "). MyLocalTon Plugin requires Java 21 or higher.",
+                          "MyLocalTon Plugin"));
               return;
             }
 
@@ -528,27 +513,6 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
                         // Download the file and update progress
                         downloadFile(fileUrl, targetFile, progressBar);
 
-                        // Execute the JAR with "version" parameter to get the version
-                        try {
-                          // Build the command to execute the JAR with "version" parameter
-                          String versionCommand =
-                              "\""
-                                  + getBundledJrePath("java")
-                                  + "\" -jar \""
-                                  + targetPath
-                                  + "\" version";
-                          final String version = executeProcess(versionCommand);
-                          LOG.warn("MyLocalTon Version detected: " + version);
-
-                          // Update the version label in the UI thread
-                          SwingUtilities.invokeLater(
-                              () -> {
-                                versionLabel.setText(version);
-                              });
-                        } catch (Exception versionEx) {
-                          LOG.warn("Error getting version: " + versionEx.getMessage(), versionEx);
-                        }
-
                         // Show success message
                         SwingUtilities.invokeLater(
                             () -> {
@@ -588,20 +552,24 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
                                         if (Desktop.isDesktopSupported()) {
                                           Desktop.getDesktop().open(new File(dirPath));
                                         } else {
-                                          // Fallback for systems where Desktop is not supported
-                                          Messages.showInfoMessage(
-                                              project,
-                                              "Download location: " + dirPath,
-                                              "MyLocalTon Plugin");
+                                          SwingUtilities.invokeLater(
+                                              () ->
+                                                  Messages.showInfoMessage(
+                                                      project,
+                                                      "Download location: " + dirPath,
+                                                      "MyLocalTon Plugin"));
                                         }
                                       } catch (Exception ex) {
                                         LOG.warn(
                                             "Error opening download location: " + ex.getMessage(),
                                             ex);
-                                        Messages.showErrorDialog(
-                                            project,
-                                            "Error opening download location: " + ex.getMessage(),
-                                            "MyLocalTon Plugin");
+                                        SwingUtilities.invokeLater(
+                                            () ->
+                                                Messages.showErrorDialog(
+                                                    project,
+                                                    "Error opening download location: "
+                                                        + ex.getMessage(),
+                                                    "MyLocalTon Plugin"));
                                       }
                                     }
                                   });
@@ -623,10 +591,32 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
                               // buttons
                               updateStatusLabel();
 
-                              Messages.showInfoMessage(
-                                  project,
-                                  "Download completed successfully!\nFile saved to: " + targetPath,
-                                  "MyLocalTon Plugin");
+                              final String version = getMyLocalTonVersion(targetPath.toString());
+                              LOG.warn("MyLocalTon Version detected: " + version);
+                              if (StringUtils.isEmpty(version)) {
+                                SwingUtilities.invokeLater(
+                                    () ->
+                                        Messages.showWarningDialog(
+                                            project,
+                                            "Download completed successfully, but MyLocalTon version cannot be detected!\nMyLocalTon requires Java 21+\nDetected Java version: "
+                                                + getJavaVersion()
+                                                + "\nFile saved to: "
+                                                + targetPath,
+                                            "MyLocalTon Plugin"));
+                                // Update the version label in the UI thread
+                                SwingUtilities.invokeLater(
+                                    () -> {
+                                      versionLabel.setText(version);
+                                    });
+                              } else {
+                                SwingUtilities.invokeLater(
+                                    () ->
+                                        Messages.showInfoMessage(
+                                            project,
+                                            "Download completed successfully!\nFile saved to: "
+                                                + targetPath,
+                                            "MyLocalTon Plugin"));
+                              }
                             });
                       } catch (Exception ex) {
                         LOG.warn("Error downloading file: " + ex.getMessage(), ex);
@@ -663,10 +653,12 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
                               bottomPanel.revalidate();
                               bottomPanel.repaint();
 
-                              Messages.showErrorDialog(
-                                  project,
-                                  "Error downloading file: " + ex.getMessage(),
-                                  "MyLocalTon Plugin");
+                              SwingUtilities.invokeLater(
+                                  () ->
+                                      Messages.showErrorDialog(
+                                          project,
+                                          "Error downloading file: " + ex.getMessage(),
+                                          "MyLocalTon Plugin"));
                               // Keep the download button disabled but change text back to original
                               downloadButton.setText("DOWNLOAD");
                               downloadButton.setEnabled(true);
@@ -706,15 +698,19 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
                   Desktop.getDesktop().open(new File(dirPath));
                 } else {
                   // Fallback for systems where Desktop is not supported
-                  Messages.showInfoMessage(
-                      project, "Download location: " + dirPath, "MyLocalTon Plugin");
+                  SwingUtilities.invokeLater(
+                      () ->
+                          Messages.showInfoMessage(
+                              project, "Download location: " + dirPath, "MyLocalTon Plugin"));
                 }
               } catch (Exception ex) {
                 LOG.warn("Error opening download location: " + ex.getMessage(), ex);
-                Messages.showErrorDialog(
-                    project,
-                    "Error opening download location: " + ex.getMessage(),
-                    "MyLocalTon Plugin");
+                SwingUtilities.invokeLater(
+                    () ->
+                        Messages.showErrorDialog(
+                            project,
+                            "Error opening download location: " + ex.getMessage(),
+                            "MyLocalTon Plugin"));
               }
             }
           });
@@ -737,29 +733,25 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
     return panel;
   }
 
-  private static @NotNull String executeProcess(String versionCommand) {
-    LOG.warn("Executing version command: " + versionCommand);
+  private static @NotNull String executeProcess(String command) {
+    LOG.warn("Executing command: " + command);
 
     try {
-
-      // Execute the command and capture the output using ProcessBuilder
       ProcessBuilder processBuilder = new ProcessBuilder();
       processBuilder.directory(Paths.get(System.getProperty("user.home"), ".mylocalton").toFile());
       if (SystemUtils.IS_OS_WINDOWS) {
-        processBuilder.command("cmd.exe", "/c", "\"" + versionCommand + "\"");
+        processBuilder.command("cmd.exe", "/c", "\"" + command + "\"");
       } else {
-        processBuilder.command("sh", "-c", versionCommand);
+        processBuilder.command("sh", "-c", command);
       }
       // Redirect error output to NUL to suppress the error messages
       processBuilder.redirectError(
           ProcessBuilder.Redirect.to(new File(SystemUtils.IS_OS_WINDOWS ? "NUL" : "/dev/null")));
-      Process versionProcess = processBuilder.start();
-      String versionOutput =
-          IOUtils.toString(versionProcess.getInputStream(), Charset.defaultCharset());
-      versionProcess.waitFor();
+      Process process = processBuilder.start();
+      String processOutput = IOUtils.toString(process.getInputStream(), Charset.defaultCharset());
+      process.waitFor();
 
-      // Trim the output and update the version label
-      return versionOutput.trim();
+      return processOutput.trim();
     } catch (Exception e) {
       return "";
     }
@@ -921,10 +913,25 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
               }
 
               if (!Files.exists(jarPath)) {
-                Messages.showErrorDialog(
-                    project,
-                    "MyLocalTon JAR file not found. Please download it first.",
-                    "MyLocalTon Plugin");
+                SwingUtilities.invokeLater(
+                    () ->
+                        Messages.showErrorDialog(
+                            project,
+                            "MyLocalTon JAR file not found. Please download it first.",
+                            "MyLocalTon Plugin"));
+                return;
+              }
+
+              final String version = getMyLocalTonVersion(jarPath.toString());
+              LOG.warn("MyLocalTon Version detected: " + version);
+              if (StringUtils.isEmpty(version)) {
+                SwingUtilities.invokeLater(
+                        () ->
+                                Messages.showWarningDialog(
+                                        project,
+                                        "MyLocalTon requires Java 21+\nDetected Java version: "
+                                                + extractJavaMajorVersion(getJavaVersion()),
+                                        "MyLocalTon Plugin"));
                 return;
               }
 
@@ -947,7 +954,9 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
               // Build the command with parameters based on checkbox states
               StringBuilder command = new StringBuilder();
               command
-                  .append("\"" + getBundledJrePath("java") + "\" -jar \"")
+                  .append("\"")
+                  .append(getJavaPath())
+                  .append("\" -jar \"")
                   .append(jarPath)
                   .append("\"");
 
@@ -1030,8 +1039,12 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
 
             } catch (Exception ex) {
               LOG.warn("Error executing command: " + ex.getMessage(), ex);
-              Messages.showErrorDialog(
-                  project, "Error executing command: " + ex.getMessage(), "MyLocalTon Plugin");
+              SwingUtilities.invokeLater(
+                  () ->
+                      Messages.showErrorDialog(
+                          project,
+                          "Error executing command: " + ex.getMessage(),
+                          "MyLocalTon Plugin"));
             }
           }
         });
@@ -1092,12 +1105,7 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
               String[] command = {
                 shell,
                 "-c",
-                "\""
-                    + getBundledJrePath("jps")
-                    + "\""
-                    + " | grep "
-                    + jarFilename
-                    + "| awk '{print $1}'"
+                "\"" + getJpsPath() + "\"" + " | grep " + jarFilename + "| awk '{print $1}'"
               };
               LOG.warn("cmd: " + Arrays.toString(command));
               ProcessBuilder processBuilder = new ProcessBuilder(command);
@@ -1231,8 +1239,10 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
 
               // Check if the file exists
               if (!logFile.exists()) {
-                Messages.showErrorDialog(
-                    project, "Log file not found at: " + logFilePath, "MyLocalTon Plugin");
+                SwingUtilities.invokeLater(
+                    () ->
+                        Messages.showErrorDialog(
+                            project, "Log file not found at: " + logFilePath, "MyLocalTon Plugin"));
                 return;
               }
 
@@ -1241,13 +1251,19 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
                 Desktop.getDesktop().open(logFile);
               } else {
                 // Fallback for systems where Desktop is not supported
-                Messages.showInfoMessage(
-                    project, "Log file location: " + logFilePath, "MyLocalTon Plugin");
+                SwingUtilities.invokeLater(
+                    () ->
+                        Messages.showInfoMessage(
+                            project, "Log file location: " + logFilePath, "MyLocalTon Plugin"));
               }
             } catch (Exception ex) {
               LOG.warn("Error opening log file: " + ex.getMessage(), ex);
-              Messages.showErrorDialog(
-                  project, "Error opening log file: " + ex.getMessage(), "MyLocalTon Plugin");
+              SwingUtilities.invokeLater(
+                  () ->
+                      Messages.showErrorDialog(
+                          project,
+                          "Error opening log file: " + ex.getMessage(),
+                          "MyLocalTon Plugin"));
             }
           }
         });
@@ -1458,10 +1474,12 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
                   } catch (IOException ex) {
                     // If an IOException occurs, it means deletion failed
                     LOG.warn("Failed to delete MyLocalTon content: " + ex.getMessage(), ex);
-                    Messages.showErrorDialog(
-                        project,
-                        "Failed to delete MyLocalTon content. Please check if the MyLocalTon process is not running.",
-                        "Deletion Failed");
+                    SwingUtilities.invokeLater(
+                        () ->
+                            Messages.showErrorDialog(
+                                project,
+                                "Failed to delete MyLocalTon content. Please check if the MyLocalTon process is not running.",
+                                "Deletion Failed"));
                   }
                 }
                 messageLabel.setText("MyLocalTon has been successfully uninstalled");
@@ -1497,12 +1515,14 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
 
               } catch (Exception ex) {
                 LOG.warn("Error deleting MyLocalTon content: " + ex.getMessage(), ex);
-                Messages.showErrorDialog(
-                    project,
-                    "Error deleting MyLocalTon content: "
-                        + ex.getMessage()
-                        + "\nPlease check if the MyLocalTon process is not running.",
-                    "Deletion Failed");
+                SwingUtilities.invokeLater(
+                    () ->
+                        Messages.showErrorDialog(
+                            project,
+                            "Error deleting MyLocalTon content: "
+                                + ex.getMessage()
+                                + "\nPlease check if the MyLocalTon process is not running.",
+                            "Deletion Failed"));
               }
             }
           }
@@ -1649,7 +1669,8 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
             @Override
             public void mouseClicked(MouseEvent e) {
               LOG.warn(text + " link clicked");
-              Messages.showInfoMessage(project, message, "MyLocalTon Plugin");
+              SwingUtilities.invokeLater(
+                  () -> Messages.showInfoMessage(project, message, "MyLocalTon Plugin"));
             }
           });
     }
@@ -1783,7 +1804,6 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
     try {
       for (Sdk sdk : ProjectJdkTable.getInstance().getAllJdks()) {
         SdkTypeId sdkType = sdk.getSdkType();
-        LOG.warn("sdkType: " + sdkType.getName());
         if (sdkType instanceof SdkType) {
           return sdk.getHomePath()
               + "/bin/"
@@ -1802,68 +1822,68 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
     }
   }
 
-  //
-  //  public static String getJavaExecutableFromProject(Project project) {
-  //    try {
-  //      LOG.warn("idea.config.path = "+System.getProperty("idea.config.path"));
-  //      Sdk sdk = ProjectRootManager.getInstance(project).getProjectSdk();
-  //      String sdkHome;
-  //      if (sdk != null) {
-  //        sdkHome = sdk.getHomePath();
-  //      } else {
-  //        LOG.error("Cannot get project sdk, trying to get sdkHome");
-  //        sdkHome = System.getProperty("java.home");
-  //      }
-  //
-  //    if (sdkHome == null) {
-  //      LOG.error("Cannot get sdkHome");
-  //      Messages.showErrorDialog(
-  //              project,
-  //              "Cannot locate JAVA HOME. Is Java installed?",
-  //              "Java Not Found");
-  //    }
-  //
-  //      return sdkHome
-  //              + File.separator
-  //              + "bin"
-  //              + File.separator
-  //              + (SystemInfo.isWindows ? "java.exe" : "java");
-  //    }
-  //    catch (Exception e) {
-  //      LOG.error("Cannot get sdkHome, "+e.getMessage());
-  //      return "java";
-  //    }
-  //  }
-  //
-  //  public static String getJpsExecutableFromProject(Project project) {
-  //    try {
-  //      Sdk sdk = ProjectRootManager.getInstance(project).getProjectSdk();
-  //      String sdkHome;
-  //      if (sdk != null) {
-  //        sdkHome = sdk.getHomePath();
-  //      } else {
-  //        LOG.error("Cannot get project sdk, trying to get sdkHome");
-  //        sdkHome = System.getProperty("java.home");
-  //      }
-  //
-  //      if (sdkHome == null) {
-  //        LOG.error("Cannot get sdkHome");
-  //        Messages.showErrorDialog(
-  //                project,
-  //                "Cannot locate JAVA HOME. Is Java installed?",
-  //                "Java Not Found");
-  //      }
-  //
-  //      return sdkHome
-  //              + File.separator
-  //              + "bin"
-  //              + File.separator
-  //              + (SystemInfo.isWindows ? "jps.exe" : "jps");
-  //    } catch (Exception e) {
-  //      LOG.error("Cannot get sdkHome, " + e.getMessage());
-  //      return "java";
-  //    }
-  //  }
+  public static String getExecutableFromSystem(String executable) {
+    try {
+      String sdkHome = System.getProperty("java.home");
+
+      if (sdkHome == null) {
+        LOG.error("Cannot get system sdkHome");
+      }
+
+      return sdkHome
+          + File.separator
+          + "bin"
+          + File.separator
+          + (SystemInfo.isWindows ? executable + ".exe" : executable);
+    } catch (Exception e) {
+      LOG.error("Cannot get sdkHome, " + e.getMessage());
+      return executable;
+    }
+  }
+
+  public static String getJavaPath() {
+    String path = getBundledJrePath("java");
+    String versionCommand = "\"" + path + "\"" + " --version";
+    String version = executeProcess(versionCommand);
+    if (StringUtils.isNotEmpty(version)) {
+      return path;
+    } else {
+      path = getExecutableFromSystem("java");
+      version = executeProcess(versionCommand);
+      if (StringUtils.isNotEmpty(version)) {
+        return path;
+      } else {
+        LOG.error("cannot detect java path");
+        return "java";
+      }
+    }
+  }
+
+  public static String getJavaVersion() {
+    String versionCommand = "\"" + getJavaPath() + "\"" + " --version";
+    return executeProcess(versionCommand);
+  }
+
+  public static String getJpsPath() {
+    String path = getBundledJrePath("jps");
+    if (StringUtils.isNotEmpty(path)) {
+      return path;
+    } else {
+      path = getExecutableFromSystem("jps");
+      if (StringUtils.isNotEmpty(path)) {
+        return path;
+      } else {
+        LOG.error("cannot detect jps path");
+        return "jps";
+      }
+    }
+  }
+
+  public static String getMyLocalTonVersion(String myLocalTonJarPath) {
+    String versionCommand = "\"" + getJavaPath() + "\" -jar \"" + myLocalTonJarPath + "\" version";
+
+    return executeProcess(versionCommand);
+  }
 
   public static int extractJavaMajorVersion(String javaVersionOutput) {
     if (javaVersionOutput == null || javaVersionOutput.isEmpty()) {
