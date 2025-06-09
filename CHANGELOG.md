@@ -1,5 +1,10 @@
 # MyLocalTon Plugin for the IntelliJ IDEs Changelog
 
+## [1.0.11]
+
+### Changes
+- always use intellij's bundled java version
+
 ## [1.0.10]
 
 ### Changes

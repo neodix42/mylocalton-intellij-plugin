@@ -38,6 +38,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import javax.swing.*;
 import javax.swing.border.TitledBorder;
+
+import com.intellij.util.SystemProperties;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -952,7 +954,7 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
               StringBuilder command = new StringBuilder();
               command
                   .append("\"")
-                  .append(getJavaPath())
+                  .append(getBundledExecutablePath("java"))
                   .append("\" -jar \"")
                   .append(jarPath)
                   .append("\"");
@@ -1102,7 +1104,7 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
               String[] command = {
                 shell,
                 "-c",
-                "\"" + getJpsPath() + "\"" + " | grep " + jarFilename + "| awk '{print $1}'"
+                "\"" + getBundledExecutablePath("jps") + "\"" + " | grep " + jarFilename + "| awk '{print $1}'"
               };
               LOG.warn("cmd: " + Arrays.toString(command));
               ProcessBuilder processBuilder = new ProcessBuilder(command);
@@ -1797,87 +1799,40 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
     }
   }
 
-  public static String getBundledJrePath(String executable) {
-    try {
-      for (Sdk sdk : ProjectJdkTable.getInstance().getAllJdks()) {
-        SdkTypeId sdkType = sdk.getSdkType();
-        if (sdkType instanceof SdkType) {
-          return sdk.getHomePath()
-              + "/bin/"
+//  private static List<File> getPotentialJdkPaths() {
+//    JavaSdk javaSdk = JavaSdk.getInstance();
+//    List<String> jdkPaths = Lists.newArrayList(javaSdk.suggestHomePaths());
+//    jdkPaths.add(SystemProperties.getJavaHome());
+//    jdkPaths.add(0, System.getenv("JDK_HOME"));
+//    List<File> virtualFiles = Lists.newArrayListWithCapacity(jdkPaths.size());
+//    for (String jdkPath : jdkPaths) {
+//      if (jdkPath != null) {
+//        File javaHome = new File(jdkPath);
+//        if (javaHome.isDirectory()) {
+//          virtualFiles.add(javaHome);
+//        }
+//      }
+//    }
+//    return virtualFiles;
+//  }
+
+  public static String getBundledExecutablePath(String executable) {
+      String bundledJavaHome = SystemProperties.getJavaHome();
+      LOG.info("bundledJavaHome: " + bundledJavaHome);
+      return bundledJavaHome
+              + File.separator+"bin"+File.separator
               + (SystemInfo.isWindows ? executable + ".exe" : executable);
-        }
-      }
-      return System.getProperty("java.home")
-          + File.separator
-          + "bin"
-          + File.separator
-          + (SystemInfo.isWindows ? executable + ".exe" : executable);
 
-    } catch (Exception e) {
-      LOG.error(e.getMessage(), e);
-      return executable;
-    }
   }
 
-  public static String getExecutableFromSystem(String executable) {
-    try {
-      String sdkHome = System.getProperty("java.home");
-
-      if (sdkHome == null) {
-        LOG.error("Cannot get system sdkHome");
-      }
-
-      return sdkHome
-          + File.separator
-          + "bin"
-          + File.separator
-          + (SystemInfo.isWindows ? executable + ".exe" : executable);
-    } catch (Exception e) {
-      LOG.error("Cannot get sdkHome, " + e.getMessage());
-      return executable;
-    }
-  }
-
-  public static String getJavaPath() {
-    String path = getBundledJrePath("java");
-    String versionCommand = "\"" + path + "\"" + " --version";
-    String version = executeProcess(versionCommand);
-    if (StringUtils.isNotEmpty(version)) {
-      return path;
-    } else {
-      path = getExecutableFromSystem("java");
-      version = executeProcess(versionCommand);
-      if (StringUtils.isNotEmpty(version)) {
-        return path;
-      } else {
-        LOG.error("cannot detect java path");
-        return "java";
-      }
-    }
-  }
 
   public static String getJavaVersion() {
-    String versionCommand = "\"" + getJavaPath() + "\"" + " --version";
+    String versionCommand = "\"" + getBundledExecutablePath("java") + "\"" + " --version";
     return executeProcess(versionCommand);
   }
 
-  public static String getJpsPath() {
-    String path = getBundledJrePath("jps");
-    if (StringUtils.isNotEmpty(path)) {
-      return path;
-    } else {
-      path = getExecutableFromSystem("jps");
-      if (StringUtils.isNotEmpty(path)) {
-        return path;
-      } else {
-        LOG.error("cannot detect jps path");
-        return "jps";
-      }
-    }
-  }
-
   public static String getMyLocalTonVersion(String myLocalTonJarPath) {
-    String versionCommand = "\"" + getJavaPath() + "\" -jar \"" + myLocalTonJarPath + "\" version";
+    String versionCommand = "\"" + getBundledExecutablePath("java") + "\" -jar \"" + myLocalTonJarPath + "\" version";
 
     return executeProcess(versionCommand);
   }
