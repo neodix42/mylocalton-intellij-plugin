@@ -603,11 +603,6 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
                                                 + "\nFile saved to: "
                                                 + targetPath,
                                             "MyLocalTon Plugin"));
-                                // Update the version label in the UI thread
-                                SwingUtilities.invokeLater(
-                                    () -> {
-                                      versionLabel.setText(version);
-                                    });
                               } else {
                                 SwingUtilities.invokeLater(
                                     () ->
@@ -617,6 +612,8 @@ public class MyLocalTonToolWindowFactory implements ToolWindowFactory {
                                                 + targetPath,
                                             "MyLocalTon Plugin"));
                               }
+                              SwingUtilities.invokeLater(
+                                      () -> versionLabel.setText(version));
                             });
                       } catch (Exception ex) {
                         LOG.warn("Error downloading file: " + ex.getMessage(), ex);
